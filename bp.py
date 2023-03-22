@@ -214,8 +214,12 @@ def plot_blood_pressures(conn):
     cbar.set_label("Time of day")
 
     plt.xticks(rotation=45)
+
+    plt.axhline(y=89, color="red", linestyle=":")
+    plt.axhline(y=139, color="red", linestyle=":")
     plt.axhline(y=80, color="black", linestyle=":")
     plt.axhline(y=120, color="black", linestyle=":")
+
     plt.xlabel("Date")
     plt.ylabel("Blood Pressure (mmHg)")
     plt.title("Blood Pressure over Time")
