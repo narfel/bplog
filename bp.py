@@ -3,7 +3,6 @@ import argparse
 import datetime as dt
 import sqlite3
 import sys
-import numpy as np
 
 from matplotlib import pyplot as plt
 
@@ -185,89 +184,33 @@ def list_all_records(conn):
     sys.exit(0)
 
 
-# def plot_blood_pressures(conn):
-#     """Retrieve all measurements from the database and plot them."""
-#     # Get database values
-#     cur = conn.cursor()
-#     cur.execute(
-#         "SELECT date, time, systolic, diastolic FROM blood_pressure ORDER BY date, time",
-#     )
-#     rows = cur.fetchall()
-
-#     # Prepare plot values
-#     dates_times = [dt.datetime.strptime(f"{row[0]} {row[1]}", "%Y-%m-%d %H:%M") for row in rows]
-#     systolics = [row[2] for row in rows]
-#     diastolics = [row[3] for row in rows]
-
-#     # Create index for times
-#     time_indices = np.arange(len(dates_times))
-
-#     # Create a colormap based on time of day
-#     cmap = plt.get_cmap("cool")
-
-#     # Plot the systolic/diastolic measurements as a scatter plot with color-coded markers
-#     fig, ax = plt.subplots()
-
-#     # Plot the measurement values as line
-#     ax.plot(dates_times, systolics, "-o", color="black", zorder=0)
-#     ax.plot(dates_times, diastolics, "-o", color="black", zorder=0)
-
-#     sc = ax.scatter(dates_times, systolics, c=time_indices, cmap=cmap)
-#     ax.scatter(dates_times, diastolics, c=time_indices, cmap=cmap)
-
-#     # Add a colorbar for the time of day
-#     cbar = fig.colorbar(sc)
-#     cbar.set_ticks(time_indices)
-#     # cbar.set_ticklabels(times)
-#     cbar.set_label("Time of day")
-
-#     plt.xticks(rotation=45)
-#     plt.axhline(y=80, color="black", linestyle=":")
-#     plt.axhline(y=120, color="black", linestyle=":")
-#     plt.xlabel("Date")
-#     plt.ylabel("Blood Pressure (mmHg)")
-#     plt.title("Blood Pressure over Time")
-#     plt.legend()
-#     plt.show()
-
-
 def plot_blood_pressures(conn):
-    """Retrieve all measurements from the database and plot them."""
-    # Get database values
     cur = conn.cursor()
     cur.execute(
         "SELECT date, time, systolic, diastolic FROM blood_pressure ORDER BY date, time",
     )
     rows = cur.fetchall()
 
-    # Prepare plot values
     dates_times = [
         dt.datetime.strptime(f"{row[0]} {row[1]}", "%Y-%m-%d %H:%M") for row in rows
     ]
     systolics = [row[2] for row in rows]
     diastolics = [row[3] for row in rows]
 
-    # Create a colormap based on time of day
-    cmap = plt.get_cmap("coolwarm")
-
-    # Calculate the fractional time of day as a value between 0 and 1
+    cmap = plt.get_cmap("plasma")
     times = [dt.datetime.strptime(str(row[1]), "%H:%M").time() for row in rows]
     time_indices = [(t.hour * 60 + t.minute) / (24 * 60) for t in times]
 
-    # Plot the systolic/diastolic measurements as a scatter plot with color-coded markers
     fig, ax = plt.subplots()
+    ax.plot(dates_times, systolics, "-o", color="red", zorder=0, label="systolic")
+    ax.plot(dates_times, diastolics, "-o", color="blue", zorder=0, label="diastolic")
 
-    # Plot the measurement values as line
-    ax.plot(dates_times, systolics, "-o", color="black", zorder=0)
-    ax.plot(dates_times, diastolics, "-o", color="black", zorder=0)
+    sc = ax.scatter(dates_times, systolics, c=time_indices, cmap=cmap, vmin=0, vmax=1)
+    ax.scatter(dates_times, diastolics, c=time_indices, cmap=cmap, vmin=0, vmax=1)
 
-    sc = ax.scatter(dates_times, systolics, c=time_indices, cmap=cmap)
-    ax.scatter(dates_times, diastolics, c=time_indices, cmap=cmap)
-
-    # Add a colorbar for the time of day
     cbar = fig.colorbar(sc)
     cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
-    cbar.set_ticklabels(["12 AM", "6 AM", "12 PM", "6 PM", "12 AM"])
+    cbar.set_ticklabels(["0:00", "06:00", "12:00", "18:00", "0:00"])
     cbar.set_label("Time of day")
 
     plt.xticks(rotation=45)
@@ -276,7 +219,7 @@ def plot_blood_pressures(conn):
     plt.xlabel("Date")
     plt.ylabel("Blood Pressure (mmHg)")
     plt.title("Blood Pressure over Time")
-    # plt.legend()
+
     plt.show()
 
 
