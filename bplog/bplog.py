@@ -59,18 +59,18 @@ def database_setup(conn):
     # create table if it doesn't exist
     cur = conn.cursor()
     cur.execute(
-        """CREATE TABLE IF NOT EXISTS blood_pressure
+        """CREATE TABLE IF NOT EXISTS bplog
                 (id INT INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
     )
     # Create an index on the date and time columns if it doesn't exist
     cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_blood_pressure_date_time ON blood_pressure(date, time)",
+        "CREATE INDEX IF NOT EXISTS idx_bplog_date_time ON bplog(date, time)",
     )
     conn.commit()
 
 
 def delete_record(conn, record_id):
-    sql = "DELETE FROM blood_pressure WHERE id = ?"
+    sql = "DELETE FROM bplog WHERE id = ?"
     cur = conn.cursor()
     cur.execute(sql, (record_id,))
     conn.commit()
@@ -107,21 +107,21 @@ def handle_multiple_records(rows, date, conn):
 
 
 def get_record_by_date(conn, date):
-    sql = "SELECT * FROM blood_pressure WHERE date(date) = ? ORDER BY time"
+    sql = "SELECT * FROM bplog WHERE date(date) = ? ORDER BY time"
     cur = conn.cursor()
     cur.execute(sql, (date,))
     return cur.fetchall()
 
 
 def delete_last_record_added():
-    conn = sqlite3.connect("blood_pressure.db")
+    conn = sqlite3.connect("bplog.db")
     cur = conn.cursor()
     cur.execute(
-        "SELECT * FROM blood_pressure WHERE id = (SELECT MAX(id) FROM blood_pressure)"
+        "SELECT * FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)"
     )
     deleted_record = cur.fetchone()
     cur.execute(
-        "DELETE FROM blood_pressure WHERE id = (SELECT MAX(id) FROM blood_pressure)"
+        "DELETE FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)"
     )
     print(f"Last record deleted: {deleted_record}")
     conn.commit()
@@ -154,7 +154,7 @@ def add_measurement(conn, args, systolic, diastolic, date_str):
     time_str = args.time or dt.datetime.now().strftime("%H:%M")
     comment = args.comment or ""
     cur.execute(
-        "INSERT INTO blood_pressure (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
         (date_str, time_str, systolic, diastolic, comment),
     )
     conn.commit()
@@ -165,7 +165,7 @@ def add_measurement(conn, args, systolic, diastolic, date_str):
 
 def list_all_records(conn):
     cur = conn.cursor()
-    cur.execute("SELECT * FROM blood_pressure ORDER BY date, time")
+    cur.execute("SELECT * FROM bplog ORDER BY date, time")
     records = cur.fetchall()
 
     try:
@@ -187,7 +187,7 @@ def list_all_records(conn):
 def plot_blood_pressures(conn):
     cur = conn.cursor()
     cur.execute(
-        "SELECT date, time, systolic, diastolic FROM blood_pressure ORDER BY date, time",
+        "SELECT date, time, systolic, diastolic FROM bplog ORDER BY date, time",
     )
     rows = cur.fetchall()
 
@@ -229,7 +229,7 @@ def plot_blood_pressures(conn):
 
 def main():
     # connect to the database and create the table if necessary
-    conn = sqlite3.connect("blood_pressure.db")
+    conn = sqlite3.connect("bplog.db")
     database_setup(conn)
 
     args = setup_cli_parser()
