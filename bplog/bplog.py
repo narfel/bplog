@@ -1,14 +1,15 @@
-""" # flake8: noqa """
 import argparse
 import datetime as dt
 import sqlite3
 import sys
+from importlib import resources
+from typing import List, NoReturn
 
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt  # type: ignore
+from matplotlib import colormaps
 
 
-def setup_cli_parser():
-    # Set up the command-line argument parser
+def setup_cli_parser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Record and graph blood pressure measurements",
     )
@@ -16,67 +17,62 @@ def setup_cli_parser():
         "bp",
         nargs="?",
         action="store",
-        help="The blood pressure measurement to insert into the database (e.g. 120:80)",
+        help="The blood pressure measurement to insert into the database separated by a colon (e.g. 120:80)",
     )
     parser.add_argument("--list", action="store_true", help="List all records")
     parser.add_argument(
         "--date",
         type=str,
         default=None,
-        help='date of measurement in the form "YYYY-MM-DD" (default: today)',
+        help='Specify the date of measurement in the form "YYYY-MM-DD" (default: today)',
     )
     parser.add_argument(
         "--time",
         type=str,
         default=None,
-        help='time of measurement in the form "HH:MM" (default: current time)',
-    )
-    parser.add_argument(
-        "--remove",
-        action="store_true",
-        help="remove an existing entry",
+        help='Specify the time of measurement in the form "HH:MM" (default: current time)',
     )
     parser.add_argument(
         "-rm",
         action="store_true",
-        help="remove record",
+        help="Remove measurement by date",
     )
     parser.add_argument(
         "-rl",
         action="store_true",
-        help="remove last record added",
+        help="Remove last measurement added",
     )
     parser.add_argument(
         "--comment",
         type=str,
         default=None,
-        help="comment for the measurement",
+        help="Add a comment for the measurement",
     )
     return parser.parse_args()
 
 
-def database_setup(conn):
+def database_setup(conn: sqlite3.Connection) -> None:
     # create table if it doesn't exist
     cur = conn.cursor()
     cur.execute(
         """CREATE TABLE IF NOT EXISTS bplog
-                (id INT INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
+                (id INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
     )
-    # Create an index on the date and time columns if it doesn't exist
+    # create an index on the date and time columns if it doesn't exist
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_bplog_date_time ON bplog(date, time)",
     )
     conn.commit()
 
 
-def delete_record(conn, record_id):
+def delete_record(conn: sqlite3.Connection, record_id: str) -> None:
     sql = "DELETE FROM bplog WHERE id = ?"
     cur = conn.cursor()
     cur.execute(sql, (record_id,))
     conn.commit()
 
 
-def remove_measurement(conn, date):
+def remove_measurement(conn: sqlite3.Connection, date: str) -> None:
     rows = get_record_by_date(conn, date)
     if not rows:
         print(f"No measurements found for {date}")
@@ -85,10 +81,12 @@ def remove_measurement(conn, date):
         delete_record(conn, rows[0][0])
         print(f"Measurement removed: {rows[0]}")
     else:
-        handle_multiple_records(rows, date, conn)
+        multiple_records(rows, date, conn)
 
 
-def handle_multiple_records(rows, date, conn):
+def multiple_records(
+    rows: List[List[str]], date: str, conn: sqlite3.Connection
+) -> None:
     print(f"{len(rows)} measurements found for {date}:")
     for row in rows:
         print(f"{row[1]} {row[2]} - {row[3]}:{row[4]}")
@@ -106,30 +104,25 @@ def handle_multiple_records(rows, date, conn):
         print(f"No measurement found for {date} at time {bp_time}")
 
 
-def get_record_by_date(conn, date):
+def get_record_by_date(conn: sqlite3.Connection, date: str) -> list:
     sql = "SELECT * FROM bplog WHERE date(date) = ? ORDER BY time"
     cur = conn.cursor()
     cur.execute(sql, (date,))
     return cur.fetchall()
 
 
-def delete_last_record_added():
-    conn = sqlite3.connect("bplog.db")
+def delete_last_record_added(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)"
-    )
+    cur.execute("SELECT * FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)")
     deleted_record = cur.fetchone()
-    cur.execute(
-        "DELETE FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)"
-    )
+    cur.execute("DELETE FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)")
     print(f"Last record deleted: {deleted_record}")
     conn.commit()
-    conn.close()
-    sys.exit()
 
 
-def parse_date_and_blood_pressure(args, conn):
+def parse_date_and_blood_pressure(
+    args: argparse.Namespace, conn: sqlite3.Connection
+) -> tuple[int, int, str]:
     if args.bp:
         bp = args.bp.split(":")
         systolic = int(bp[0])
@@ -148,7 +141,13 @@ def parse_date_and_blood_pressure(args, conn):
         sys.exit()
 
 
-def add_measurement(conn, args, systolic, diastolic, date_str):
+def add_measurement(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+    systolic: int,
+    diastolic: int,
+    date_str: str,
+) -> None:
     """Add measurements to the database."""
     cur = conn.cursor()
     time_str = args.time or dt.datetime.now().strftime("%H:%M")
@@ -163,28 +162,74 @@ def add_measurement(conn, args, systolic, diastolic, date_str):
     )
 
 
-def list_all_records(conn):
+def check_sqlite_version(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
-    cur.execute("SELECT * FROM bplog ORDER BY date, time")
-    records = cur.fetchall()
+    cur.execute("SELECT sqlite_version()")
+    version = cur.fetchone()[0]
+    print(f"SQLite version: {version}")
 
+
+def show_table_info(conn: sqlite3.Connection) -> None:
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(bplog)")
+    table_info = cur.fetchall()
+    for column in table_info:
+        print(column)
+
+
+def recreate_db_ids(conn: sqlite3.Connection) -> None:
+    cur = conn.cursor()
+    cur.execute(
+        """CREATE TEMPORARY TABLE bplog_backup
+                (date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
+    )
+    cur.execute(
+        "INSERT INTO bplog_backup SELECT date, time, systolic, diastolic, comment FROM bplog"
+    )
+    cur.execute("DROP TABLE bplog")
+    cur.execute(
+        """CREATE TABLE bplog
+                (id INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
+    )
+    cur.execute(
+        "INSERT INTO bplog SELECT NULL, date, time, systolic, diastolic, comment FROM bplog_backup"
+    )
+    cur.execute("DROP TABLE bplog_backup")
+
+    conn.commit()
+
+
+def list_all_records(conn: sqlite3.Connection) -> NoReturn:
     try:
-        from prettytable import PrettyTable
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM bplog ORDER BY date, time")
+        records = cur.fetchall()
+        try:
+            from prettytable import PrettyTable
 
-        table = PrettyTable(["Date", "Time", "Blood Pressure", "Comment"])
-        for record in records:
-            bp = f"{record[3]}:{record[4]}"
-            table.add_row([record[1], record[2], bp, record[5]])
-        print(table)
-    except ImportError:
-        # If prettytable is not installed, print the table without pretty formatting
-        for record in records:
-            bp = f"{record[3]}:{record[4]}"
-            print(f"{record[1]}\t{record[2]}\t{bp}")
+            table = PrettyTable(["Date", "Time", "Blood Pressure", "Comment"])
+            print(f"{table = }")
+            for record in records:
+                if len(record) != 6:
+                    print(f"Unexpected row format: {record}")
+                    continue
+                bp = f"{record[3]}:{record[4]}"
+                table.add_row([record[1], record[2], bp, record[5]])
+            print(table)
+        except ImportError:
+            # If prettytable is not installed, print the table without pretty formatting
+            for record in records:
+                bp = f"{record[3]}:{record[4]}"
+                print(f"{record[1]}\t{record[2]}\t{bp}\t{record[5]}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+
+        traceback.print_exc()
     sys.exit(0)
 
 
-def plot_blood_pressures(conn):
+def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
     cur.execute(
         "SELECT date, time, systolic, diastolic FROM bplog ORDER BY date, time",
@@ -197,7 +242,7 @@ def plot_blood_pressures(conn):
     systolics = [row[2] for row in rows]
     diastolics = [row[3] for row in rows]
 
-    cmap = plt.get_cmap("plasma")
+    cmap = colormaps.get_cmap("cool_r")
     times = [dt.datetime.strptime(str(row[1]), "%H:%M").time() for row in rows]
     time_indices = [(t.hour * 60 + t.minute) / (24 * 60) for t in times]
 
@@ -227,34 +272,36 @@ def plot_blood_pressures(conn):
     plt.show()
 
 
-def main():
-    # connect to the database and create the table if necessary
-    conn = sqlite3.connect("bplog.db")
-    database_setup(conn)
+def main() -> None:
+    # connect to the database
+    with resources.path("bplog", "bplog.db") as db_path:
+        conn = sqlite3.connect(db_path)
 
-    args = setup_cli_parser()
+        database_setup(conn)
 
-    if args.rl:
-        delete_last_record_added()
+        args = setup_cli_parser()
 
-    if args.rm:
-        date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
-        remove_measurement(conn, date)
+        if args.rl:
+            delete_last_record_added(conn)
 
-    if args.list:
-        list_all_records(conn)
+        if args.rm:
+            date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
+            remove_measurement(conn, date)
 
-    # Parse the blood pressure measurement and the date
-    systolic, diastolic, date_str = parse_date_and_blood_pressure(args, conn)
+        if args.list:
+            list_all_records(conn)
 
-    # write input blood pressure to database
-    add_measurement(conn, args, systolic, diastolic, date_str)
+        # Parse the blood pressure measurement and the date
+        systolic, diastolic, date_str = parse_date_and_blood_pressure(args, conn)
 
-    # plot
-    plot_blood_pressures(conn)
+        # write input blood pressure to database
+        add_measurement(conn, args, systolic, diastolic, date_str)
 
-    # Close the database connection
-    conn.close()
+        # plot
+        plot_blood_pressures(conn)
+
+        # Close the database connection
+        conn.close()
 
 
 if __name__ == "__main__":
