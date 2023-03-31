@@ -3,13 +3,14 @@ import datetime as dt
 import sqlite3
 import sys
 from importlib import resources
-from typing import List, NoReturn
+from typing import List
 
+from matplotlib import colormaps  # type: ignore
 from matplotlib import pyplot as plt  # type: ignore
-from matplotlib import colormaps
+from matplotlib.lines import Line2D
 
 
-def setup_cli_parser() -> argparse.Namespace:
+def setup_cli_parser(args=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Record and graph blood pressure measurements",
     )
@@ -72,7 +73,7 @@ def delete_record(conn: sqlite3.Connection, record_id: str) -> None:
     conn.commit()
 
 
-def remove_measurement(conn: sqlite3.Connection, date: str) -> None:
+def remove_measurement_by_date(conn: sqlite3.Connection, date: str) -> None:
     rows = get_record_by_date(conn, date)
     if not rows:
         print(f"No measurements found for {date}")
@@ -121,7 +122,8 @@ def delete_last_record_added(conn: sqlite3.Connection) -> None:
 
 
 def parse_date_and_blood_pressure(
-    args: argparse.Namespace, conn: sqlite3.Connection
+    args: argparse.Namespace,
+    conn: sqlite3.Connection,
 ) -> tuple[int, int, str]:
     if args.bp:
         bp = args.bp.split(":")
@@ -138,7 +140,7 @@ def parse_date_and_blood_pressure(
         return systolic, diastolic, db_date_str
     else:
         plot_blood_pressures(conn)
-        sys.exit()
+        sys.exit(0)
 
 
 def add_measurement(
@@ -162,71 +164,37 @@ def add_measurement(
     )
 
 
-def check_sqlite_version(conn: sqlite3.Connection) -> None:
+def get_all_records(conn: sqlite3.Connection) -> list:
     cur = conn.cursor()
-    cur.execute("SELECT sqlite_version()")
-    version = cur.fetchone()[0]
-    print(f"SQLite version: {version}")
+    cur.execute("SELECT * FROM bplog ORDER BY date, time")
+    return cur.fetchall()
 
 
-def show_table_info(conn: sqlite3.Connection) -> None:
-    cur = conn.cursor()
-    cur.execute("PRAGMA table_info(bplog)")
-    table_info = cur.fetchall()
-    for column in table_info:
-        print(column)
-
-
-def recreate_db_ids(conn: sqlite3.Connection) -> None:
-    cur = conn.cursor()
-    cur.execute(
-        """CREATE TEMPORARY TABLE bplog_backup
-                (date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
-    )
-    cur.execute(
-        "INSERT INTO bplog_backup SELECT date, time, systolic, diastolic, comment FROM bplog"
-    )
-    cur.execute("DROP TABLE bplog")
-    cur.execute(
-        """CREATE TABLE bplog
-                (id INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
-    )
-    cur.execute(
-        "INSERT INTO bplog SELECT NULL, date, time, systolic, diastolic, comment FROM bplog_backup"
-    )
-    cur.execute("DROP TABLE bplog_backup")
-
-    conn.commit()
-
-
-def list_all_records(conn: sqlite3.Connection) -> NoReturn:
+def generate_table(records) -> str:
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM bplog ORDER BY date, time")
-        records = cur.fetchall()
-        try:
-            from prettytable import PrettyTable
+        from prettytable import PrettyTable
 
-            table = PrettyTable(["Date", "Time", "Blood Pressure", "Comment"])
-            print(f"{table = }")
-            for record in records:
-                if len(record) != 6:
-                    print(f"Unexpected row format: {record}")
-                    continue
-                bp = f"{record[3]}:{record[4]}"
-                table.add_row([record[1], record[2], bp, record[5]])
-            print(table)
-        except ImportError:
-            # If prettytable is not installed, print the table without pretty formatting
-            for record in records:
-                bp = f"{record[3]}:{record[4]}"
-                print(f"{record[1]}\t{record[2]}\t{bp}\t{record[5]}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        import traceback
+        table = PrettyTable(["Date", "Time", "Blood Pressure", "Comment"])
+        for record in records:
+            if len(record) != 6:
+                raise ValueError(f"Unexpected row format: {record}")
+            bp = f"{record[3]}:{record[4]}"
+            table.add_row([record[1], record[2], bp, record[5]])
+        return str(table)
+    except ImportError:
+        # If prettytable is not installed, generate the table without pretty formatting
+        output = []
+        for record in records:
+            bp = f"{record[3]}:{record[4]}"
+            output.append(f"{record[1]}\t{record[2]}\t{bp}\t{record[5]}")
+        return "\n".join(output)
 
-        traceback.print_exc()
-    sys.exit(0)
+
+def list_all_records(conn: sqlite3.Connection) -> str:
+    records = get_all_records(conn)
+    table = generate_table(records)
+    conn.close()
+    return table
 
 
 def plot_blood_pressures(conn: sqlite3.Connection) -> None:
@@ -241,6 +209,9 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     ]
     systolics = [row[2] for row in rows]
     diastolics = [row[3] for row in rows]
+
+    sys_avg = sum(systolics) / len(systolics)
+    dias_avg = sum(diastolics) / len(diastolics)
 
     cmap = colormaps.get_cmap("cool_r")
     times = [dt.datetime.strptime(str(row[1]), "%H:%M").time() for row in rows]
@@ -260,8 +231,13 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
 
     plt.xticks(rotation=45)
 
-    plt.axhline(y=89, color="red", linestyle=":")
-    plt.axhline(y=139, color="red", linestyle=":")
+    # show lines for averages
+    plt.axhline(y=sys_avg, color="green", linestyle="--")
+    plt.axhline(y=dias_avg, color="green", linestyle="--")
+
+    # show lines for prehipertension
+    plt.axhline(y=90, color="red", linestyle=":")
+    plt.axhline(y=140, color="red", linestyle=":")
     plt.axhline(y=80, color="black", linestyle=":")
     plt.axhline(y=120, color="black", linestyle=":")
 
@@ -269,40 +245,47 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     plt.ylabel("Blood Pressure (mmHg)")
     plt.title("Blood Pressure over Time")
 
+    custom_lines = [
+        Line2D([0], [0], color="black", linestyle=":"),
+        Line2D([0], [0], color="red", linestyle=":"),
+        Line2D([0], [0], color="green", linestyle="--"),
+    ]
+    plt.legend(custom_lines, ["normal", "prehypertension", "average"])
+
     plt.show()
+
+
+def connect_to_database() -> sqlite3.Connection:
+    with resources.path("bplog", "bplog.db") as db_path:
+        conn = sqlite3.connect(db_path)
+        database_setup(conn)
+        return conn
 
 
 def main() -> None:
     # connect to the database
-    with resources.path("bplog", "bplog.db") as db_path:
-        conn = sqlite3.connect(db_path)
+    conn = connect_to_database()
+    # get args
+    args = setup_cli_parser()
 
-        database_setup(conn)
+    if args.rl:
+        delete_last_record_added(conn)
 
-        args = setup_cli_parser()
+    if args.rm:
+        date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
+        remove_measurement_by_date(conn, date)
 
-        if args.rl:
-            delete_last_record_added(conn)
+    if args.list:
+        print(list_all_records(conn))
+        sys.exit(0)
 
-        if args.rm:
-            date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
-            remove_measurement(conn, date)
+    systolic, diastolic, date_str = parse_date_and_blood_pressure(args, conn)
+    add_measurement(conn, args, systolic, diastolic, date_str)
 
-        if args.list:
-            list_all_records(conn)
+    plot_blood_pressures(conn)
 
-        # Parse the blood pressure measurement and the date
-        systolic, diastolic, date_str = parse_date_and_blood_pressure(args, conn)
-
-        # write input blood pressure to database
-        add_measurement(conn, args, systolic, diastolic, date_str)
-
-        # plot
-        plot_blood_pressures(conn)
-
-        # Close the database connection
-        conn.close()
+    conn.close()
 
 
 if __name__ == "__main__":
-    main()
+    main()  # pragma: no cover
