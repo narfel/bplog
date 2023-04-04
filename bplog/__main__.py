@@ -1,8 +1,8 @@
 import argparse
 import datetime as dt
+from pathlib import Path
 import sqlite3
 import sys
-from importlib import resources
 from typing import List
 
 from matplotlib import colormaps  # type: ignore
@@ -49,6 +49,12 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
         default=None,
         help="Add a comment for the measurement",
     )
+    parser.add_argument(
+        "--in-memory",
+        action="store_true",
+        help="Use an in-memory database",
+    )
+
     return parser.parse_args()
 
 
@@ -255,18 +261,19 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     plt.show()
 
 
-def connect_to_database() -> sqlite3.Connection:
-    with resources.path("bplog", "bplog.db") as database_path:
-        conn = sqlite3.connect(database_path)
-        database_setup(conn)
-        return conn
+def connect_to_database(use_in_memory: bool) -> sqlite3.Connection:
+    if use_in_memory:
+        conn = sqlite3.connect(":memory:")
+    else:
+        db_path = Path("bplog") / "bplog.db"
+        conn = sqlite3.connect(str(db_path))
+    database_setup(conn)
+    return conn
 
 
 def main() -> None:
-    # connect to the database
-    conn = connect_to_database()
-    # get args
     args = setup_cli_parser()
+    conn = connect_to_database(args.in_memory)
 
     if args.rl:
         delete_last_record_added(conn)

@@ -1,10 +1,11 @@
 """Unittest."""
 import argparse
-import os
 import sqlite3
 import sys
 import unittest
+
 from io import StringIO
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import matplotlib
@@ -17,10 +18,9 @@ matplotlib.use("Agg")
 
 class TestBplog(unittest.TestCase):
     def test_connect_to_database(self):
-        with patch.dict(os.environ, {"BPLOG_DB_PATH": ":memory:"}):
-            conn = bplog.__main__.connect_to_database()
-            self.assertIsInstance(conn, sqlite3.Connection)
-            conn.close()
+        conn = bplog.__main__.connect_to_database(use_in_memory=True)
+        self.assertIsInstance(conn, sqlite3.Connection)
+        conn.close()
 
     def test_setup_cli_parser(self) -> None:
         with patch(
@@ -333,7 +333,15 @@ class TestMain(unittest.TestCase):
     def test_main(self):
         conn = sqlite3.connect(":memory:")
         bplog.__main__.database_setup(conn)
-        sys.argv = ["bplog", "130:90", "--date", "03,03,2023", "--time", "19:00"]
+        sys.argv = [
+            "bplog",
+            "130:90",
+            "--date",
+            "03,03,2023",
+            "--time",
+            "19:00",
+            "--in-memory",
+        ]
 
         # capture sys.stdout
         with StringIO() as mock_stdout:
@@ -348,6 +356,40 @@ class TestMain(unittest.TestCase):
         # reset sys.stdout
         sys.stdout = sys.__stdout__
         conn.close()
+
+
+class TestBPLog(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        bplog.__main__.database_setup(self.conn)
+
+    def tearDown(self):
+        self.conn.close()
+
+    @mock.patch("bplog.__main__.delete_last_record_added")
+    def test_main_rl(self, mock_delete_last_record_added):
+        sys.argv = [
+            "bplog",
+            "-rl",
+        ]
+
+        # capture sys.stdout
+        with patch(
+            "bplog.__main__.delete_last_record_added",
+        ) as mock_delete_last_record_added:
+            with StringIO() as mock_stdout:
+                with self.assertRaises(SystemExit):
+                    sys.stdout = mock_stdout
+                    bplog.__main__.main()
+                    # output = mock_stdout.getvalue()
+                    # expected_output = "fart"
+                    # self.assertEqual(output, expected_output)
+
+            # assert that delete_last_record_added was called with the connection
+            mock_delete_last_record_added.assert_called_with(mock.ANY)
+
+        # reset sys.stdout
+        sys.stdout = sys.__stdout__
 
 
 if __name__ == "__main__":

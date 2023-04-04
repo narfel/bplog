@@ -1,0 +1,2 @@
+[flake8]
+ignore = WPS202, E501, WPS421
