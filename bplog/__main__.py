@@ -1,13 +1,11 @@
 import argparse
+import configparser
+import csv
 import datetime as dt
-from pathlib import Path
 import sqlite3
 import sys
+from pathlib import Path
 from typing import List
-
-from matplotlib import colormaps  # type: ignore
-from matplotlib import pyplot as plt  # type: ignore
-from matplotlib.lines import Line2D
 
 
 def setup_cli_parser(args=None) -> argparse.Namespace:
@@ -52,7 +50,18 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
     parser.add_argument(
         "--in-memory",
         action="store_true",
-        help="Use an in-memory database",
+        help="Use an in-memory database (for testing)",
+    )
+    parser.add_argument(
+        "--csv",
+        action="store_true",
+        help="Export database to csv",
+    )
+    parser.add_argument(
+        "--config", type=str, default=None, help="Path to configuration file"
+    )
+    parser.add_argument(
+        "--reset_config", action="store_true", help="Reset the config path"
     )
 
     return parser.parse_args()
@@ -204,12 +213,22 @@ def list_all_records(conn: sqlite3.Connection) -> str:
 
 
 def plot_blood_pressures(conn: sqlite3.Connection) -> None:
+    try:
+        from matplotlib import colormaps
+        from matplotlib import pyplot as plt
+        from matplotlib.lines import Line2D
+    except ImportError:
+        sys.exit()
+
     cur = conn.cursor()
     cur.execute(
         "SELECT date, time, systolic, diastolic FROM bplog ORDER BY date, time",
     )
     rows = cur.fetchall()
 
+    if rows == []:
+        print("No data to plot")
+        return
     dates_times = [
         dt.datetime.strptime(f"{row[0]} {row[1]}", "%Y-%m-%d %H:%M") for row in rows
     ]
@@ -261,19 +280,149 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     plt.show()
 
 
-def connect_to_database(use_in_memory: bool) -> sqlite3.Connection:
+def export_to_csv(conn):
+    cur = conn.cursor()
+    data = cur.execute("SELECT * FROM bplog")
+    with open("bplog_database.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["date", "time", "systolic", "diastolic", "comment"])
+        writer.writerows(data)
+
+
+# def connect_to_database(use_in_memory: bool) -> sqlite3.Connection:
+#     if use_in_memory:
+#         conn = sqlite3.connect(":memory:")
+#     else:
+#         db_path = Path("bplog") / "bplog.db"
+#         conn = sqlite3.connect(str(db_path))
+#     database_setup(conn)
+#     return conn
+
+
+def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
     if use_in_memory:
         conn = sqlite3.connect(":memory:")
     else:
-        db_path = Path("bplog") / "bplog.db"
-        conn = sqlite3.connect(str(db_path))
-    database_setup(conn)
+        if db_path is None:
+            config = configparser.ConfigParser()
+            config.read("config.ini")
+            db_file_path = (
+                config["Database"]["file_path"]
+                if "Database" in config and "file_path" in config["Database"]
+                else str(Path("bplog") / "bplog.db")
+            )
+            db_path = Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
+        else:
+            db_path = Path(db_path)
+
+            config = configparser.ConfigParser()
+            config["Database"] = {"file_path": str(db_path)}
+            with open("config.ini", "w") as config_file:
+                config.write(config_file)
+
+        if not db_path.exists():
+            conn = sqlite3.connect(db_path)
+            database_setup(conn)
+        elif db_path.stat().st_mode & 0o200:
+            conn = sqlite3.connect(db_path)
+            database_setup(conn)
+        else:
+            raise ValueError(f"File '{db_path}' is not writable")
+
     return conn
+
+    # def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
+    #     if use_in_memory:
+    #         conn = sqlite3.connect(":memory:")
+    #     else:
+    #         if db_path is None:
+    #             config = configparser.ConfigParser()
+    #             config.read("config.ini")
+    #             db_path = (
+    #                 config["Database"]["path"]
+    #                 if "Database" in config and "path" in config["Database"]
+    #                 else str(Path("bplog") / "bplog.db")
+    #             )
+    #         else:
+    #             config = configparser.ConfigParser()
+    #             config["Database"] = {"path": db_path}
+    #             with open("config.ini", "w") as config_file:
+    #                 config.write(config_file)
+
+    #         print(Path(db_path).stat().st_mode)
+    #         if not Path(db_path).exists():
+    #             print(f"Creating database file at {db_path}")
+    #             conn = sqlite3.connect(db_path)
+    #             database_setup(conn)
+    #         elif Path(db_path).stat().st_mode & 0o200:
+    #             print(f"Opening database file at {db_path}")
+    #             conn = sqlite3.connect(db_path)
+    #             database_setup(conn)
+    #         else:
+    #             raise ValueError(f"File '{db_path}' is not writable")
+
+    return conn
+
+
+# def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
+#     if use_in_memory:
+#         conn = sqlite3.connect(":memory:")
+#     else:
+#         if db_path is None:
+#             config = configparser.ConfigParser()
+#             config.read("config.ini")
+#             db_path = (
+#                 config["Database"]["path"]
+#                 if "Database" in config and "path" in config["Database"]
+#                 else str(Path("bplog") / "bplog.db")
+#             )
+#         else:
+#             config = configparser.ConfigParser()
+#             config["Database"] = {"path": db_path}
+#             with open("config.ini", "w") as config_file:
+#                 config.write(config_file)
+#         print(db_path)
+#         conn = sqlite3.connect(db_path)
+#     database_setup(conn)
+#     return conn
+
+
+# def update_db_path_config(db_path: str):
+#     config = configparser.ConfigParser()
+#     config["Database"] = {"path": db_path}
+#     with open("config.ini", "w") as config_file:
+#         config.write(config_file)
+
+
+def reset_db_path_config():
+    config_file = Path("config.ini")
+    if config_file.exists():
+        config_file.unlink()
+
+
+# def reset_db_path_config(db_path: str):
+#     config = configparser.ConfigParser()
+#     config["Database"] = {"path": None}
+#     with open("config.ini", "w") as config_file:
+#         config.write(config_file)
+
+# def get_db_path_config() -> str:
+#     config = configparser.ConfigParser()
+#     config.read("config.ini")
+#     return config["Database"]["path"]
 
 
 def main() -> None:
     args = setup_cli_parser()
-    conn = connect_to_database(args.in_memory)
+
+    if args.reset_config:
+        reset_db_path_config()
+        sys.exit(0)
+
+    if args.config:
+        conn = connect_to_database(args.in_memory, args.config)
+    else:
+        conn = connect_to_database(args.in_memory)
 
     if args.rl:
         delete_last_record_added(conn)
@@ -285,6 +434,9 @@ def main() -> None:
     if args.list:
         print(list_all_records(conn))
         sys.exit(0)
+
+    if args.csv:
+        export_to_csv(conn)
 
     systolic, diastolic, date_str = parse_date_and_blood_pressure(args, conn)
     add_measurement(conn, args, systolic, diastolic, date_str)
