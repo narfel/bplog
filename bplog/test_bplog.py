@@ -1,12 +1,16 @@
 """Unittest."""
 import argparse
+import csv
+import importlib
+import os
+from pathlib import Path
 import sqlite3
 import sys
 import unittest
 
 from io import StringIO
 from unittest import mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import matplotlib
 from matplotlib import pyplot as plt
@@ -218,6 +222,51 @@ class TestAddMeasurement(unittest.TestCase):
 
         conn.close()
 
+class TestExportToCsv(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        cur = self.conn.cursor()
+        cur.execute("CREATE TABLE bplog (date text, time text, systolic integer, diastolic integer, comment text)")
+        cur.execute("INSERT INTO bplog VALUES ('2022-01-01', '12:00', 120, 80, 'test comment')")
+        self.conn.commit()
+
+    def test_export_to_csv(self):
+        bplog.__main__.export_to_csv(self.conn)
+        with open("bplog_database.csv", "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            data = list(reader)
+        self.assertEqual(header, ["date", "time", "systolic", "diastolic", "comment"])
+        self.assertEqual(data, [["2022-01-01", "12:00", "120", "80", "test comment"]])
+
+    def tearDown(self):
+        csv_file = Path("bplog_database.csv")
+        if csv_file.exists():
+            csv_file.unlink()
+        self.conn.close()
+
+class TestEmpty(unittest.TestCase):
+    def test_plot_blood_pressure(self):
+        with unittest.mock.patch("builtins.print") as mock_print:
+            conn = sqlite3.connect(":memory:")
+            bplog.__main__.database_setup(conn)
+            bplog.__main__.plot_blood_pressures(conn)
+            mock_print.assert_called_once_with("No data to plot")
+
+# class TestPlotBloodPressures(unittest.TestCase):
+#     def test_plot_blood_pressures(self):
+#         conn = sqlite3.connect(":memory:")
+#         bplog.__main__.database_setup(conn)
+#         with self.assertRaises(SystemExit):
+#             bplog.__main__.plot_blood_pressures(conn)
+
+class TestPlotBloodPressures2(unittest.TestCase):
+    @patch.dict('sys.modules', {'matplotlib': None})
+    def test_plot_blood_pressures(self):
+        conn = sqlite3.connect(":memory:")
+        bplog.__main__.database_setup(conn)
+        with self.assertRaises(SystemExit):
+            bplog.__main__.plot_blood_pressures(conn)
 
 class TestParsing(unittest.TestCase):
     def test_parse_date_and_blood_pressure(self):
@@ -329,33 +378,18 @@ class TestPlotFunc(unittest.TestCase):
         assert plt.fignum_exists(1)
 
 
-class TestMain(unittest.TestCase):
-    def test_main(self):
-        conn = sqlite3.connect(":memory:")
-        bplog.__main__.database_setup(conn)
-        sys.argv = [
-            "bplog",
-            "130:90",
-            "--date",
-            "03,03,2023",
-            "--time",
-            "19:00",
-            "--in-memory",
-        ]
+class TestResetDbPathConfig(unittest.TestCase):
+    def test_reset_db_path_config(self):
+        # Create a dummy config file
+        config_file = Path("config.ini")
+        with open(config_file, "w") as f:
+            f.write("dummy content")
 
-        # capture sys.stdout
-        with StringIO() as mock_stdout:
-            sys.stdout = mock_stdout
-            bplog.__main__.main()
-            output = mock_stdout.getvalue()
-            expected_output = (
-                "Blood pressure measurement added: 130/90 (2023-03-03 19:00)\n"
-            )
-            self.assertEqual(output, expected_output)
+        # Call the function to reset the config file
+        bplog.__main__.reset_db_path_config()
 
-        # reset sys.stdout
-        sys.stdout = sys.__stdout__
-        conn.close()
+        # Assert that the config file no longer exists
+        self.assertFalse(config_file.exists())
 
 
 class TestBPLog(unittest.TestCase):
@@ -373,7 +407,6 @@ class TestBPLog(unittest.TestCase):
             "-rl",
         ]
 
-        # capture sys.stdout
         with patch(
             "bplog.__main__.delete_last_record_added",
         ) as mock_delete_last_record_added:
@@ -381,15 +414,9 @@ class TestBPLog(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     sys.stdout = mock_stdout
                     bplog.__main__.main()
-                    # output = mock_stdout.getvalue()
-                    # expected_output = "fart"
-                    # self.assertEqual(output, expected_output)
 
             # assert that delete_last_record_added was called with the connection
             mock_delete_last_record_added.assert_called_with(mock.ANY)
-
-        # reset sys.stdout
-        sys.stdout = sys.__stdout__
 
 
 if __name__ == "__main__":

@@ -289,16 +289,6 @@ def export_to_csv(conn):
         writer.writerows(data)
 
 
-# def connect_to_database(use_in_memory: bool) -> sqlite3.Connection:
-#     if use_in_memory:
-#         conn = sqlite3.connect(":memory:")
-#     else:
-#         db_path = Path("bplog") / "bplog.db"
-#         conn = sqlite3.connect(str(db_path))
-#     database_setup(conn)
-#     return conn
-
-
 def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
     if use_in_memory:
         conn = sqlite3.connect(":memory:")
@@ -315,7 +305,17 @@ def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Con
         else:
             db_path = Path(db_path)
 
-            config = configparser.ConfigParser()
+        config = configparser.ConfigParser()
+        if (
+            config.read("config.ini")
+            and "Database" in config
+            and "file_path" in config["Database"]
+        ):
+            if db_path != config["Database"]["file_path"]:
+                config.set("Database", "file_path", str(db_path))
+                with open("config.ini", "w") as config_file:
+                    config.write(config_file)
+        else:
             config["Database"] = {"file_path": str(db_path)}
             with open("config.ini", "w") as config_file:
                 config.write(config_file)
@@ -331,85 +331,11 @@ def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Con
 
     return conn
 
-    # def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
-    #     if use_in_memory:
-    #         conn = sqlite3.connect(":memory:")
-    #     else:
-    #         if db_path is None:
-    #             config = configparser.ConfigParser()
-    #             config.read("config.ini")
-    #             db_path = (
-    #                 config["Database"]["path"]
-    #                 if "Database" in config and "path" in config["Database"]
-    #                 else str(Path("bplog") / "bplog.db")
-    #             )
-    #         else:
-    #             config = configparser.ConfigParser()
-    #             config["Database"] = {"path": db_path}
-    #             with open("config.ini", "w") as config_file:
-    #                 config.write(config_file)
-
-    #         print(Path(db_path).stat().st_mode)
-    #         if not Path(db_path).exists():
-    #             print(f"Creating database file at {db_path}")
-    #             conn = sqlite3.connect(db_path)
-    #             database_setup(conn)
-    #         elif Path(db_path).stat().st_mode & 0o200:
-    #             print(f"Opening database file at {db_path}")
-    #             conn = sqlite3.connect(db_path)
-    #             database_setup(conn)
-    #         else:
-    #             raise ValueError(f"File '{db_path}' is not writable")
-
-    return conn
-
-
-# def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
-#     if use_in_memory:
-#         conn = sqlite3.connect(":memory:")
-#     else:
-#         if db_path is None:
-#             config = configparser.ConfigParser()
-#             config.read("config.ini")
-#             db_path = (
-#                 config["Database"]["path"]
-#                 if "Database" in config and "path" in config["Database"]
-#                 else str(Path("bplog") / "bplog.db")
-#             )
-#         else:
-#             config = configparser.ConfigParser()
-#             config["Database"] = {"path": db_path}
-#             with open("config.ini", "w") as config_file:
-#                 config.write(config_file)
-#         print(db_path)
-#         conn = sqlite3.connect(db_path)
-#     database_setup(conn)
-#     return conn
-
-
-# def update_db_path_config(db_path: str):
-#     config = configparser.ConfigParser()
-#     config["Database"] = {"path": db_path}
-#     with open("config.ini", "w") as config_file:
-#         config.write(config_file)
-
 
 def reset_db_path_config():
     config_file = Path("config.ini")
     if config_file.exists():
         config_file.unlink()
-
-
-# def reset_db_path_config(db_path: str):
-#     config = configparser.ConfigParser()
-#     config["Database"] = {"path": None}
-#     with open("config.ini", "w") as config_file:
-#         config.write(config_file)
-
-# def get_db_path_config() -> str:
-#     config = configparser.ConfigParser()
-#     config.read("config.ini")
-#     return config["Database"]["path"]
 
 
 def main() -> None:
