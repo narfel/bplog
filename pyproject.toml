@@ -1,3 +1,18 @@
 [build-system]
 requires = ["setuptools>=59", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+# ignore matplotlib warning about agg backend
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+]
+
+[flake8]
+ignore = ["WPS202", "E501", "WPS421"]
+
+# [tool.setuptools.entrypoints]
+# console_scripts = [
+#     "bplog = bplog_pkg.bplog_mod:main"
+# ]

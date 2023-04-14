@@ -136,26 +136,19 @@ def delete_last_record_added(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def parse_date_and_blood_pressure(
-    args: argparse.Namespace,
-    conn: sqlite3.Connection,
-) -> tuple[int, int, str]:
-    if args.bp:
-        bp = args.bp.split(":")
-        systolic = int(bp[0])
-        diastolic = int(bp[1])
+def parse_date_and_blood_pressure(args: argparse.Namespace) -> tuple[int, int, str]:
+    bp = args.bp.split(":")
+    systolic = int(bp[0])
+    diastolic = int(bp[1])
 
-        date_format = "%d,%m,%Y"
-        date_str = args.date or dt.datetime.now().strftime(date_format)
+    date_format = "%d,%m,%Y"
+    date_str = args.date or dt.datetime.now().strftime(date_format)
 
-        date_obj = dt.datetime.strptime(date_str, date_format)
+    date_obj = dt.datetime.strptime(date_str, date_format)
 
-        db_date_format = "%Y-%m-%d"
-        db_date_str = date_obj.strftime(db_date_format)
-        return systolic, diastolic, db_date_str
-    else:
-        plot_blood_pressures(conn)
-        sys.exit(0)
+    db_date_format = "%Y-%m-%d"
+    db_date_str = date_obj.strftime(db_date_format)
+    return systolic, diastolic, db_date_str
 
 
 def add_measurement(
@@ -299,7 +292,7 @@ def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Con
             db_file_path = (
                 config["Database"]["file_path"]
                 if "Database" in config and "file_path" in config["Database"]
-                else str(Path("bplog") / "bplog.db")
+                else str(Path("bplog_pkg") / "bplog.db")
             )
             db_path = Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
         else:
@@ -338,36 +331,102 @@ def reset_db_path_config():
         config_file.unlink()
 
 
+# def main() -> None:
+#     args = setup_cli_parser()
+
+#     if args.reset_config:
+#         reset_db_path_config()
+#         sys.exit(0)
+
+#     if args.config:
+#         conn = connect_to_database(args.in_memory, args.config)
+#     else:
+#         conn = connect_to_database(args.in_memory)
+
+#     if args.rl:
+#         delete_last_record_added(conn)
+
+#     if args.rm:
+#         date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
+#         remove_measurement_by_date(conn, date)
+
+#     if args.list:
+#         print(list_all_records(conn))
+#         sys.exit(0)
+
+#     if args.csv:
+#         export_to_csv(conn)
+
+#     if args.bp:
+#         systolic, diastolic, date_str = parse_date_and_blood_pressure(args)
+#         add_measurement(conn, args, systolic, diastolic, date_str)
+#     else:
+#         plot_blood_pressures(conn)
+#         sys.exit(0)
+
+#     if not args.rl:
+#         plot_blood_pressures(conn)
+
+#     conn.close()
+
+
+def handle_reset_config(conn, args):
+    reset_db_path_config()
+    sys.exit(0)
+
+
+def handle_remove_last_record(conn, args):
+    delete_last_record_added(conn)
+
+
+def handle_remove_measurement(conn, args):
+    date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
+    remove_measurement_by_date(conn, date)
+
+
+def handle_list_records(conn, args):
+    print(list_all_records(conn))
+    sys.exit(0)
+
+
+def handle_export_to_csv(conn, args):
+    export_to_csv(conn)
+
+
+def handle_add_measurement(conn, args):
+    systolic, diastolic, date_str = parse_date_and_blood_pressure(args)
+    add_measurement(conn, args, systolic, diastolic, date_str)
+
+
+def handle_plot_blood_pressures(conn, args):
+    plot_blood_pressures(conn)
+    sys.exit(0)
+
+
+handlers = {
+    "reset_config": handle_reset_config,
+    "rl": handle_remove_last_record,
+    "rm": handle_remove_measurement,
+    "list": handle_list_records,
+    "csv": handle_export_to_csv,
+    "bp": handle_add_measurement,
+}
+
+
 def main() -> None:
     args = setup_cli_parser()
-
-    if args.reset_config:
-        reset_db_path_config()
-        sys.exit(0)
 
     if args.config:
         conn = connect_to_database(args.in_memory, args.config)
     else:
         conn = connect_to_database(args.in_memory)
 
-    if args.rl:
-        delete_last_record_added(conn)
+    for arg, bplog_handler in handlers.items():
+        if getattr(args, arg):
+            bplog_handler(conn, args)
 
-    if args.rm:
-        date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
-        remove_measurement_by_date(conn, date)
-
-    if args.list:
-        print(list_all_records(conn))
-        sys.exit(0)
-
-    if args.csv:
-        export_to_csv(conn)
-
-    systolic, diastolic, date_str = parse_date_and_blood_pressure(args, conn)
-    add_measurement(conn, args, systolic, diastolic, date_str)
-
-    plot_blood_pressures(conn)
+    if not args.rl:
+        plot_blood_pressures(conn)
 
     conn.close()
 
