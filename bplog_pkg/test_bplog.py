@@ -1,25 +1,118 @@
 """Unittest."""
 import argparse
+import configparser
 import csv
 import sqlite3
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, mock_open, patch
 
 import matplotlib
 from matplotlib import pyplot as plt
 
 from bplog_pkg import __main__
 
-matplotlib.use("Agg")
+matplotlib.use("agg")
 
 
-class TestBplog(unittest.TestCase):
+class TestConnectToDatabase(unittest.TestCase):
     def test_connect_to_database(self):
         conn = __main__.connect_to_database(use_in_memory=True)
         self.assertIsInstance(conn, sqlite3.Connection)
         conn.close()
 
+    def test_connect_to_database_else(self):
+        conn = __main__.connect_to_database(use_in_memory=False, db_config="test.db")
+        conn.close()
+        config_file = Path("config.ini")
+        db_temp_file = Path("test.db")
+        if config_file.exists():
+            config_file.unlink()
+        if db_temp_file.exists():
+            db_temp_file.unlink()
+        self.assertIsInstance(conn, sqlite3.Connection)
+
+    def test_connect_to_database_valueerror(self):
+        with patch("os.stat") as mock_stat:
+            with self.assertRaises(ValueError):
+                mock_stat.return_value = Mock(st_mode=0o444)
+                __main__.connect_to_database(False, "test_db_config")
+
+    def test_connect_to_database_exception(self):
+        with patch("sqlite3.connect") as mock_connect:
+            mock_connect.side_effect = Exception("Test exception")
+            with patch("pathlib.Path.exists") as mock_exists:
+                mock_exists.return_value = False
+                with self.assertRaisesRegex(Exception, "Test exception"):
+                    __main__.connect_to_database(False, "test_db_config")
+
+    def test_connect_to_database_st(self):
+        with patch("pathlib.Path.stat") as mock_stat:
+            mock_stat.return_value = Mock(st_mode=0o200)
+            with patch("sqlite3.connect") as mock_connect:
+                mock_connect.return_value = Mock()
+                conn = __main__.connect_to_database(False, "test_db_config")
+                assert conn is not None
+                mock_connect.assert_called_once_with((Path("test_db_config")))
+
+
+class TestHandles(unittest.TestCase):
+    def test_handle_list_records(self):
+        with patch("bplog_pkg.__main__.list_all_records") as mock_list:
+            with patch("sys.exit") as mock_exit:
+                mock_conn = Mock()
+                mock_list.return_value = ["record1", "record2"]
+                __main__.handle_list_records(mock_conn, None)
+                mock_list.assert_called_once_with(mock_conn)
+                mock_exit.assert_called_once_with(0)
+
+    def test_handle_export_to_csv(self):
+        with patch("bplog_pkg.__main__.export_to_csv") as mock_export:
+            mock_conn = Mock()
+            __main__.handle_export_to_csv(mock_conn, None)
+            mock_export.assert_called_once_with(mock_conn)
+
+    def test_handle_reset_config(self):
+        with patch("bplog_pkg.__main__.reset_db_path_config"):
+            with self.assertRaises(SystemExit):
+                __main__.handle_reset_config(None, None)
+
+    def test_handle_remove_measurement(self):
+        with patch("bplog_pkg.__main__.remove_measurement_by_date") as mock_remove:
+            mock_conn = Mock()
+            date = "02-02-2023"
+            with patch("builtins.input", return_value=date):
+                __main__.handle_remove_measurement(mock_conn, date)
+                mock_remove.assert_called_once_with(mock_conn, date)
+
+    def test_handle_remove_last_record(self):
+        with patch("bplog_pkg.__main__.delete_last_record_added") as mock_delete:
+            mock_conn = Mock()
+            __main__.handle_remove_last_record(mock_conn, None)
+            mock_delete.assert_called_once_with(mock_conn)
+
+    def test_handle_plot_blood_pressures(self):
+        with patch("bplog_pkg.__main__.plot_blood_pressures") as mock_plot:
+            with patch("sys.exit") as mock_exit:
+                mock_conn = Mock()
+                __main__.handle_plot_blood_pressures(mock_conn, None)
+                mock_plot.assert_called_once_with(mock_conn)
+
+    def test_handle_add_measurement(self):
+        mock_args = argparse.Namespace(time=None, comment=None)
+        with patch("bplog_pkg.__main__.add_measurement") as mock_add:
+            with patch(
+                "bplog_pkg.__main__.parse_date_and_blood_pressure",
+                return_value=(120, 80, "02-02-2023 19:00"),
+            ):
+                mock_conn = Mock()
+                __main__.handle_add_measurement(mock_conn, mock_args)
+                mock_add.assert_called_once_with(
+                    mock_conn, mock_args, 120, 80, "02-02-2023 19:00"
+                )
+
+
+class TestCLIParser(unittest.TestCase):
     def test_setup_cli_parser(self) -> None:
         with patch(
             "sys.argv",
@@ -45,6 +138,8 @@ class TestBplog(unittest.TestCase):
         self.assertTrue(test_args.rl)
         self.assertEqual(test_args.comment, "moin")
 
+
+class TestDatabaseSetup(unittest.TestCase):
     def test_database_setup(self) -> None:
         conn = sqlite3.connect(":memory:")
         __main__.database_setup(conn)
@@ -63,6 +158,8 @@ class TestBplog(unittest.TestCase):
         self.assertEqual(db_index, 1)
         conn.close()
 
+
+class TestGetSetDelete(unittest.TestCase):
     def test_delete_record(self) -> None:
         conn = sqlite3.connect(":memory:")
         __main__.database_setup(conn)
@@ -74,9 +171,7 @@ class TestBplog(unittest.TestCase):
         cur.execute("SELECT id, date, time, systolic, diastolic, comment FROM bplog")
         rows = cur.fetchall()
         self.assertEqual(rows, [(1, "2020-03-03", "11:00", 120, 80, "Lorem Ipsum")])
-        # run func
         __main__.delete_record(conn, 1)
-        # assert empty
         empty_rows = cur.fetchall()
         self.assertEqual(empty_rows, [])
         conn.close()
@@ -91,7 +186,6 @@ class TestBplog(unittest.TestCase):
         )
         __main__.get_record_by_date(conn, "2020-03-03")
         deleted_record = cur.fetchall()
-        # assert empty
         self.assertEqual(deleted_record, [])
         conn.close()
 
@@ -106,12 +200,30 @@ class TestBplog(unittest.TestCase):
         with patch("builtins.print") as mock_print:
             __main__.delete_last_record_added(conn)
             deleted_record = cur.fetchall()
-            # assert empty
             self.assertEqual(deleted_record, [])
-            # assert print statement
             mock_print.assert_called_with(
                 "Last record deleted: (1, '2020-03-03', '11:00', 120, 80, 'Lorem Ipsum')",
             )
+        conn.close()
+
+    def test_add_measurement(self):
+        conn = sqlite3.connect(":memory:")
+        __main__.database_setup(conn)
+        mock_args = {"time": "09:50", "comment": "Lorem Ipsum"}
+        args = argparse.Namespace(**mock_args)
+
+        with patch("builtins.print") as mock_print:
+            __main__.add_measurement(conn, args, 120, 80, "2020-02-02")
+            mock_print.assert_called_once_with(
+                "Blood pressure measurement added: 120/80 (2020-02-02 09:50)",
+            )
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, date, time, systolic, diastolic, comment FROM bplog",
+            )
+            rows = cur.fetchall()
+            self.assertEqual(rows, [(1, "2020-02-02", "09:50", 120, 80, "Lorem Ipsum")])
+
         conn.close()
 
 
@@ -195,28 +307,6 @@ class TestRemoveMeasurementByDate(unittest.TestCase):
                 )
 
 
-class TestAddMeasurement(unittest.TestCase):
-    def test_add_measurement(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
-        mock_args = {"time": "09:50", "comment": "Lorem Ipsum"}
-        args = argparse.Namespace(**mock_args)
-
-        with patch("builtins.print") as mock_print:
-            __main__.add_measurement(conn, args, 120, 80, "2020-02-02")
-            mock_print.assert_called_once_with(
-                "Blood pressure measurement added: 120/80 (2020-02-02 09:50)",
-            )
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT id, date, time, systolic, diastolic, comment FROM bplog",
-            )
-            rows = cur.fetchall()
-            self.assertEqual(rows, [(1, "2020-02-02", "09:50", 120, 80, "Lorem Ipsum")])
-
-        conn.close()
-
-
 class TestExportToCsv(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
@@ -252,15 +342,6 @@ class TestEmpty(unittest.TestCase):
             __main__.database_setup(conn)
             __main__.plot_blood_pressures(conn)
             mock_print.assert_called_once_with("No data to plot")
-
-
-class TestPlotBloodPressures2(unittest.TestCase):
-    @patch.dict("sys.modules", {"matplotlib": None})
-    def test_plot_blood_pressures(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
-        with self.assertRaises(SystemExit):
-            __main__.plot_blood_pressures(conn)
 
 
 class TestParsing(unittest.TestCase):
@@ -348,7 +429,7 @@ class TestTableError(unittest.TestCase):
 
 
 class TestPlotFunc(unittest.TestCase):
-    def test_plot_blood_pressures(self):
+    def test_plot_blood_pressures_data(self):
         conn = sqlite3.connect(":memory:")
         __main__.database_setup(conn)
         cur = conn.cursor()
@@ -359,19 +440,93 @@ class TestPlotFunc(unittest.TestCase):
         __main__.plot_blood_pressures(conn)
         self.assertTrue(plt.fignum_exists(1))
 
+    @patch.dict("sys.modules", {"matplotlib": None})
+    def test_plot_blood_pressures_sysexit(self):
+        conn = sqlite3.connect(":memory:")
+        __main__.database_setup(conn)
+        with self.assertRaises(SystemExit):
+            __main__.plot_blood_pressures(conn)
 
-class TestResetDbPathConfig(unittest.TestCase):
+
+class TestDB_Path(unittest.TestCase):
     def test_reset_db_path_config(self):
-        # Create a dummy config file
+        # dummy config file
         config_file = Path("config.ini")
         with open(config_file, "w") as f:
             f.write("dummy content")
-
-        # Call the function to reset the config file
         __main__.reset_db_path_config()
-
-        # Assert that the config file no longer exists
         self.assertFalse(config_file.exists())
+
+    def test_get_db_path_string(self):
+        db_config = "daterbais"
+        return_val = __main__.get_db_path(db_config)
+        self.assertEqual(return_val.name, "daterbais")
+
+    def test_get_db_path_dot(self):
+        db_config = "."
+        return_val = __main__.get_db_path(db_config)
+        self.assertEqual(return_val.name, "bplog.db")
+
+    def test_get_db_path_none(self):
+        config_file = Path("config.ini")
+        if config_file.exists():
+            config_file.unlink()  # pragma no cover
+        db_config = None
+        return_val = __main__.get_db_path(db_config)
+        self.assertEqual(return_val.name, "bplog.db")
+        self.assertEqual(return_val.parent.name, "bplog_pkg")
+
+    def test_config_read_exception(self):
+        db_config = None
+        with patch(
+            "configparser.ConfigParser.read", side_effect=Exception("Mock exception")
+        ):
+            with self.assertRaises(Exception) as context:
+                __main__.get_db_path(db_config)
+                self.assertEqual(str(context.exception), "Mock exception")
+
+
+class TestDBConfig(unittest.TestCase):
+    def test_update_db_config(self):
+        db_path = Path("new_db_path.db")
+
+        config_data = "[Database]\nfile_path=old_db_path.db\n"
+        with patch("builtins.open", mock_open(read_data=config_data)) as mock_open_func:
+            __main__.update_db_config(db_path)
+            mock_open_func.assert_called_with("config.ini", "w")
+            handle = mock_open_func()
+            self.assertGreaterEqual(handle.write.call_count, 1)
+            written_content = "".join(
+                [call.args[0] for call in handle.write.call_args_list]
+            )
+            written_config = configparser.ConfigParser()
+            written_config.read_string(written_content)
+            self.assertEqual(written_config["Database"]["file_path"], str(db_path))
+
+    def test_update_db_config_raise(self):
+        with patch(
+            "configparser.ConfigParser.read", side_effect=Exception("Mock exception")
+        ):
+            with self.assertRaises(Exception) as context:
+                db_path = "moo"
+                __main__.update_db_config(db_path)
+                self.assertEqual(str(context.exception), "Mock exception")
+
+    def test_update_db_config_return(self):
+        db_path = "moo"
+        mock_config = configparser.ConfigParser()
+        with patch.dict(mock_config, {"Database": {"file_path": "foo"}}, clear=True):
+            with patch("configparser.ConfigParser.read", return_value=True):
+                with patch("builtins.open", new_callable=mock_open) as mock_file:
+                    __main__.update_db_config(db_path)
+                    mock_file.assert_called_with("config.ini", "w")
+
+    def test_update_db_config_not_equal(self):
+        with patch("configparser.ConfigParser.read", return_value="moo"):
+            with patch("builtins.open", new_callable=mock_open) as mock_file:
+                db_path = "not_moo"
+                mock_file.return_value = open(__main__.update_db_config(db_path), "w")
+                __main__.update_db_config(db_path)
 
 
 if __name__ == "__main__":

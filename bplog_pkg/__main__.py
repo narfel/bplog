@@ -58,10 +58,15 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
         help="Export database to csv",
     )
     parser.add_argument(
-        "--config", type=str, default=None, help="Path to configuration file"
+        "--config",
+        type=str,
+        default=None,
+        help="Path to configuration file",
     )
     parser.add_argument(
-        "--reset_config", action="store_true", help="Reset the config path"
+        "--reset_config",
+        action="store_true",
+        help="Reset the config path",
     )
 
     return parser.parse_args()
@@ -72,7 +77,7 @@ def database_setup(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
     cur.execute(
         """CREATE TABLE IF NOT EXISTS bplog
-                (id INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)"""
+                (id INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)""",
     )
     # create an index on the date and time columns if it doesn't exist
     cur.execute(
@@ -101,7 +106,9 @@ def remove_measurement_by_date(conn: sqlite3.Connection, date: str) -> None:
 
 
 def multiple_records(
-    rows: List[List[str]], date: str, conn: sqlite3.Connection
+    rows: List[List[str]],
+    date: str,
+    conn: sqlite3.Connection,
 ) -> None:
     print(f"{len(rows)} measurements found for {date}:")
     for row in rows:
@@ -113,7 +120,7 @@ def multiple_records(
             delete_record(conn, row[0])
             found = True
             print(
-                f"Measurement removed: {row[1]} {row[2]} - {row[3]}:{row[4]} (id:{row[0]})"
+                f"Measurement removed: {row[1]} {row[2]} - {row[3]}:{row[4]} (id:{row[0]})",
             )
             break
     if not found:
@@ -270,10 +277,12 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     ]
     plt.legend(custom_lines, ["normal", "prehypertension", "average"])
 
-    plt.show()
+    # don't run if non-GUI backend is used during testing
+    if plt.get_backend() != "agg":
+        plt.show()  # pragma: no cover
 
 
-def export_to_csv(conn):
+def export_to_csv(conn) -> None:
     cur = conn.cursor()
     data = cur.execute("SELECT * FROM bplog")
     with open("bplog_database.csv", "w", newline="", encoding="utf-8") as f:
@@ -282,23 +291,33 @@ def export_to_csv(conn):
         writer.writerows(data)
 
 
-def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Connection:
-    if use_in_memory:
-        conn = sqlite3.connect(":memory:")
-    else:
-        if db_path is None:
-            config = configparser.ConfigParser()
+def get_db_path(db_config: str = None) -> Path:
+    if db_config is None:
+        config = configparser.ConfigParser()
+        try:
             config.read("config.ini")
             db_file_path = (
                 config["Database"]["file_path"]
                 if "Database" in config and "file_path" in config["Database"]
                 else str(Path("bplog_pkg") / "bplog.db")
             )
-            db_path = Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
-        else:
-            db_path = Path(db_path)
+        except Exception as e:
+            print(f"Error reading config file: {e}")
+            db_file_path = str(Path("bplog_pkg") / "bplog.db")
+        print(
+            "\n>>> get_db_path(): This is the path before return: ",
+            Path(db_file_path).parent / f"{Path(db_file_path).stem}.db",
+        )
+        return Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
+    elif db_config == ".":
+        return Path(Path.cwd()) / "bplog.db"
+    else:
+        return Path(db_config)
 
-        config = configparser.ConfigParser()
+
+def update_db_config(db_path: Path) -> None:
+    config = configparser.ConfigParser()
+    try:
         if (
             config.read("config.ini")
             and "Database" in config
@@ -308,20 +327,38 @@ def connect_to_database(use_in_memory: bool, db_path: str = None) -> sqlite3.Con
                 config.set("Database", "file_path", str(db_path))
                 with open("config.ini", "w") as config_file:
                     config.write(config_file)
-        else:
+        elif db_path != Path("bplog_pkg") / "bplog.db":
             config["Database"] = {"file_path": str(db_path)}
-            with open("config.ini", "w") as config_file:
-                config.write(config_file)
+            with open("config.ini", "w") as config_file_2:
+                config.write(config_file_2)
+    except Exception as e:
+        print(f"Error updating config file: {e}")
 
-        if not db_path.exists():
-            conn = sqlite3.connect(db_path)
-            database_setup(conn)
-        elif db_path.stat().st_mode & 0o200:
-            conn = sqlite3.connect(db_path)
-            database_setup(conn)
-        else:
-            raise ValueError(f"File '{db_path}' is not writable")
 
+def connect_to_database(
+    use_in_memory: bool,
+    db_config: str = None,
+) -> sqlite3.Connection:
+    if use_in_memory:
+        conn = sqlite3.connect(":memory:")
+    else:
+        db_path = get_db_path(db_config)
+        update_db_config(db_path)
+        try:
+            if not db_path.exists():
+                conn = sqlite3.connect(db_path)
+                database_setup(conn)
+            elif db_path.stat().st_mode & 0o200:
+                conn = sqlite3.connect(db_path)
+                database_setup(conn)
+            else:
+                raise ValueError(f"File '{db_path}' is not writable")
+        except ValueError:
+            raise
+        except Exception as e:
+            print(f"Error connecting to database: {e}")
+            raise
+            # conn = None
     return conn
 
 
@@ -329,45 +366,6 @@ def reset_db_path_config():
     config_file = Path("config.ini")
     if config_file.exists():
         config_file.unlink()
-
-
-# def main() -> None:
-#     args = setup_cli_parser()
-
-#     if args.reset_config:
-#         reset_db_path_config()
-#         sys.exit(0)
-
-#     if args.config:
-#         conn = connect_to_database(args.in_memory, args.config)
-#     else:
-#         conn = connect_to_database(args.in_memory)
-
-#     if args.rl:
-#         delete_last_record_added(conn)
-
-#     if args.rm:
-#         date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
-#         remove_measurement_by_date(conn, date)
-
-#     if args.list:
-#         print(list_all_records(conn))
-#         sys.exit(0)
-
-#     if args.csv:
-#         export_to_csv(conn)
-
-#     if args.bp:
-#         systolic, diastolic, date_str = parse_date_and_blood_pressure(args)
-#         add_measurement(conn, args, systolic, diastolic, date_str)
-#     else:
-#         plot_blood_pressures(conn)
-#         sys.exit(0)
-
-#     if not args.rl:
-#         plot_blood_pressures(conn)
-
-#     conn.close()
 
 
 def handle_reset_config(conn, args):
@@ -413,7 +411,7 @@ handlers = {
 }
 
 
-def main() -> None:
+def main() -> None:# pragma: no cover
     args = setup_cli_parser()
 
     if args.config:
@@ -432,4 +430,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()  # pragma: no cover
+    main()  # pragma no cover

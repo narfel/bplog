@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 /backup_bplog.db
 /cov.bat
+cov.ps1
+bplog_pkg/bplog.db
