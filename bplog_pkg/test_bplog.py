@@ -1,4 +1,5 @@
 """Unittest."""
+# flake8: noqa
 import argparse
 import configparser
 import csv
@@ -13,6 +14,12 @@ from matplotlib import pyplot as plt
 from bplog_pkg import __main__
 
 matplotlib.use("agg")
+
+
+def setup_test_database():
+    conn = sqlite3.connect(":memory:")
+    __main__.database_setup(conn)
+    return conn
 
 
 class TestConnectToDatabase(unittest.TestCase):
@@ -36,7 +43,7 @@ class TestConnectToDatabase(unittest.TestCase):
         with patch("os.stat") as mock_stat:
             with self.assertRaises(ValueError):
                 mock_stat.return_value = Mock(st_mode=0o444)
-                __main__.connect_to_database(False, "test_db_config")
+                __main__.connect_to_database(0, "test_db_config")
 
     def test_connect_to_database_exception(self):
         with patch("sqlite3.connect") as mock_connect:
@@ -44,14 +51,14 @@ class TestConnectToDatabase(unittest.TestCase):
             with patch("pathlib.Path.exists") as mock_exists:
                 mock_exists.return_value = False
                 with self.assertRaisesRegex(Exception, "Test exception"):
-                    __main__.connect_to_database(False, "test_db_config")
+                    __main__.connect_to_database(0, "test_db_config")
 
     def test_connect_to_database_st(self):
         with patch("pathlib.Path.stat") as mock_stat:
             mock_stat.return_value = Mock(st_mode=0o200)
             with patch("sqlite3.connect") as mock_connect:
                 mock_connect.return_value = Mock()
-                conn = __main__.connect_to_database(False, "test_db_config")
+                conn = __main__.connect_to_database(0, "test_db_config")
                 assert conn is not None
                 mock_connect.assert_called_once_with((Path("test_db_config")))
 
@@ -93,7 +100,7 @@ class TestHandles(unittest.TestCase):
 
     def test_handle_plot_blood_pressures(self):
         with patch("bplog_pkg.__main__.plot_blood_pressures") as mock_plot:
-            with patch("sys.exit") as mock_exit:
+            with patch("sys.exit"):
                 mock_conn = Mock()
                 __main__.handle_plot_blood_pressures(mock_conn, None)
                 mock_plot.assert_called_once_with(mock_conn)
@@ -141,8 +148,7 @@ class TestCLIParser(unittest.TestCase):
 
 class TestDatabaseSetup(unittest.TestCase):
     def test_database_setup(self) -> None:
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         cur = conn.cursor()
         cur.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='bplog'",
@@ -161,8 +167,7 @@ class TestDatabaseSetup(unittest.TestCase):
 
 class TestGetSetDelete(unittest.TestCase):
     def test_delete_record(self) -> None:
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
@@ -177,8 +182,7 @@ class TestGetSetDelete(unittest.TestCase):
         conn.close()
 
     def test_get_record_by_date(self) -> None:
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
@@ -190,8 +194,7 @@ class TestGetSetDelete(unittest.TestCase):
         conn.close()
 
     def test_delete_last_record_added(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
@@ -207,8 +210,7 @@ class TestGetSetDelete(unittest.TestCase):
         conn.close()
 
     def test_add_measurement(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         mock_args = {"time": "09:50", "comment": "Lorem Ipsum"}
         args = argparse.Namespace(**mock_args)
 
@@ -308,46 +310,42 @@ class TestRemoveMeasurementByDate(unittest.TestCase):
 
 
 class TestExportToCsv(unittest.TestCase):
-    def setUp(self):
-        self.conn = sqlite3.connect(":memory:")
-        cur = self.conn.cursor()
+    def test_export_to_csv(self):
+        conn = sqlite3.connect(":memory:")
+        cur = conn.cursor()
         cur.execute(
             "CREATE TABLE bplog (date text, time text, systolic integer, diastolic integer, comment text)",
         )
         cur.execute(
             "INSERT INTO bplog VALUES ('2022-01-01', '12:00', 120, 80, 'test comment')",
         )
-        self.conn.commit()
-
-    def test_export_to_csv(self):
-        __main__.export_to_csv(self.conn)
+        conn.commit()
+        __main__.export_to_csv(conn)
         with open("bplog_database.csv", "r", newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
             header = next(reader)
-            data = list(reader)
+            expected = list(reader)
         self.assertEqual(header, ["date", "time", "systolic", "diastolic", "comment"])
-        self.assertEqual(data, [["2022-01-01", "12:00", "120", "80", "test comment"]])
-
-    def tearDown(self):
+        self.assertEqual(
+            expected, [["2022-01-01", "12:00", "120", "80", "test comment"]]
+        )
         csv_file = Path("bplog_database.csv")
         if csv_file.exists():
             csv_file.unlink()
-        self.conn.close()
+        conn.close()
 
 
-class TestEmpty(unittest.TestCase):
+class TestNoData(unittest.TestCase):
     def test_plot_blood_pressure(self):
         with patch("builtins.print") as mock_print:
-            conn = sqlite3.connect(":memory:")
-            __main__.database_setup(conn)
+            conn = setup_test_database()
             __main__.plot_blood_pressures(conn)
             mock_print.assert_called_once_with("No data to plot")
 
 
 class TestParsing(unittest.TestCase):
     def test_parse_date_and_blood_pressure(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        setup_test_database()
         mock_args = {"bp": "09:50", "date": "02,02,2020"}
         args = argparse.Namespace(**mock_args)
         returned_values = __main__.parse_date_and_blood_pressure(args)
@@ -399,26 +397,21 @@ class TestListAllRecords(unittest.TestCase):
 
 
 class TestTableError(unittest.TestCase):
-    def setUp(self):
-        self.conn = sqlite3.connect(":memory:")
-        __main__.database_setup(self.conn)
-        self.conn.execute(
+    def test_generate_table_error(self):
+        conn = setup_test_database()
+        conn.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
             ("2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
         )
-        self.conn.execute(
+        conn.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
             ("2020-03-03", "11:02", 122, 82, "Lorem Ipsum  2"),
         )
-        self.conn.execute(
+        conn.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic) VALUES (?, ?, ?, ?)",
             ("2020-03-05", "11:03", 123, 83),
         )
 
-    def tearDown(self) -> None:
-        self.conn.close()
-
-    def test_generate_table_error(self):
         records = [
             (1, "2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
             (2, "2020-03-03", "11:02", 122, 82, "Lorem Ipsum  2"),
@@ -426,12 +419,12 @@ class TestTableError(unittest.TestCase):
         ]
         with self.assertRaises(ValueError):
             __main__.generate_table(records)
+        conn.close()
 
 
 class TestPlotFunc(unittest.TestCase):
     def test_plot_blood_pressures_data(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
@@ -442,8 +435,7 @@ class TestPlotFunc(unittest.TestCase):
 
     @patch.dict("sys.modules", {"matplotlib": None})
     def test_plot_blood_pressures_sysexit(self):
-        conn = sqlite3.connect(":memory:")
-        __main__.database_setup(conn)
+        conn = setup_test_database()
         with self.assertRaises(SystemExit):
             __main__.plot_blood_pressures(conn)
 
@@ -489,15 +481,13 @@ class TestDB_Path(unittest.TestCase):
 class TestDBConfig(unittest.TestCase):
     def test_update_db_config(self):
         db_path = Path("new_db_path.db")
-
         config_data = "[Database]\nfile_path=old_db_path.db\n"
         with patch("builtins.open", mock_open(read_data=config_data)) as mock_open_func:
             __main__.update_db_config(db_path)
             mock_open_func.assert_called_with("config.ini", "w")
-            handle = mock_open_func()
-            self.assertGreaterEqual(handle.write.call_count, 1)
+            self.assertGreaterEqual(mock_open_func().write.call_count, 1)
             written_content = "".join(
-                [call.args[0] for call in handle.write.call_args_list]
+                [call.args[0] for call in mock_open_func().write.call_args_list]
             )
             written_config = configparser.ConfigParser()
             written_config.read_string(written_content)
@@ -525,8 +515,9 @@ class TestDBConfig(unittest.TestCase):
         with patch("configparser.ConfigParser.read", return_value="moo"):
             with patch("builtins.open", new_callable=mock_open) as mock_file:
                 db_path = "not_moo"
-                mock_file.return_value = open(__main__.update_db_config(db_path), "w")
-                __main__.update_db_config(db_path)
+                with open(__main__.update_db_config(db_path), "w") as tempfile:
+                    mock_file.return_value = tempfile
+                    __main__.update_db_config(db_path)
 
 
 if __name__ == "__main__":

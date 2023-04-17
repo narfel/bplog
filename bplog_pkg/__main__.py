@@ -411,7 +411,7 @@ handlers = {
 }
 
 
-def main() -> None:# pragma: no cover
+def main() -> None:  # pragma: no cover
     args = setup_cli_parser()
 
     if args.config:
