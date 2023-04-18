@@ -11,7 +11,7 @@ from unittest.mock import Mock, mock_open, patch
 import matplotlib
 from matplotlib import pyplot as plt
 
-from bplog_pkg import __main__
+from src.bplog import __main__
 
 matplotlib.use("agg")
 
@@ -59,7 +59,7 @@ class TestConnectToDatabase(unittest.TestCase):
 
 class TestHandles(unittest.TestCase):
     def test_handle_list_records(self):
-        with patch("bplog_pkg.__main__.list_all_records") as mock_list:
+        with patch("src.bplog.__main__.list_all_records") as mock_list:
             with patch("sys.exit") as mock_exit:
                 mock_conn = Mock()
                 mock_list.return_value = ["record1", "record2"]
@@ -68,18 +68,18 @@ class TestHandles(unittest.TestCase):
                 mock_exit.assert_called_once_with(0)
 
     def test_handle_export_to_csv(self):
-        with patch("bplog_pkg.__main__.export_to_csv") as mock_export:
+        with patch("src.bplog.__main__.export_to_csv") as mock_export:
             mock_conn = Mock()
             __main__.handle_export_to_csv(mock_conn, None)
             mock_export.assert_called_once_with(mock_conn)
 
     def test_handle_reset_config(self):
-        with patch("bplog_pkg.__main__.reset_db_path_config"):
+        with patch("src.bplog.__main__.reset_db_path_config"):
             with self.assertRaises(SystemExit):
                 __main__.handle_reset_config(None, None)
 
     def test_handle_remove_measurement(self):
-        with patch("bplog_pkg.__main__.remove_measurement_by_date") as mock_remove:
+        with patch("src.bplog.__main__.remove_measurement_by_date") as mock_remove:
             mock_conn = Mock()
             date = "02-02-2023"
             with patch("builtins.input", return_value=date):
@@ -87,13 +87,13 @@ class TestHandles(unittest.TestCase):
                 mock_remove.assert_called_once_with(mock_conn, date)
 
     def test_handle_remove_last_record(self):
-        with patch("bplog_pkg.__main__.delete_last_record_added") as mock_delete:
+        with patch("src.bplog.__main__.delete_last_record_added") as mock_delete:
             mock_conn = Mock()
             __main__.handle_remove_last_record(mock_conn, None)
             mock_delete.assert_called_once_with(mock_conn)
 
     def test_handle_plot_blood_pressures(self):
-        with patch("bplog_pkg.__main__.plot_blood_pressures") as mock_plot:
+        with patch("src.bplog.__main__.plot_blood_pressures") as mock_plot:
             with patch("sys.exit"):
                 mock_conn = Mock()
                 __main__.handle_plot_blood_pressures(mock_conn, None)
@@ -101,9 +101,9 @@ class TestHandles(unittest.TestCase):
 
     def test_handle_add_measurement(self):
         mock_args = argparse.Namespace(time=None, comment=None)
-        with patch("bplog_pkg.__main__.add_measurement") as mock_add:
+        with patch("src.bplog.__main__.add_measurement") as mock_add:
             with patch(
-                "bplog_pkg.__main__.parse_date_and_blood_pressure",
+                "src.bplog.__main__.parse_date_and_blood_pressure",
                 return_value=(120, 80, "02-02-2023 19:00"),
             ):
                 mock_conn = Mock()

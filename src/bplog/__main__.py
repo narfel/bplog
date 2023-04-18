@@ -299,15 +299,11 @@ def get_db_path(db_config: str = None) -> Path:
             db_file_path = (
                 config["Database"]["file_path"]
                 if "Database" in config and "file_path" in config["Database"]
-                else str(Path("bplog_pkg") / "bplog.db")
+                else str(Path("src") / "bplog_pkg" / "bplog.db")
             )
         except Exception as e:
             print(f"Error reading config file: {e}")
-            db_file_path = str(Path("bplog_pkg") / "bplog.db")
-        print(
-            "\n>>> get_db_path(): This is the path before return: ",
-            Path(db_file_path).parent / f"{Path(db_file_path).stem}.db",
-        )
+            db_file_path = str(Path("src") / "bplog_pkg" / "bplog.db")
         return Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
     elif db_config == ".":
         return Path(Path.cwd()) / "bplog.db"
@@ -327,7 +323,7 @@ def update_db_config(db_path: Path) -> None:
                 config.set("Database", "file_path", str(db_path))
                 with open("config.ini", "w") as config_file:
                     config.write(config_file)
-        elif db_path != Path("bplog_pkg") / "bplog.db":
+        elif db_path != Path("src") / "bplog_pkg" / "bplog.db":
             config["Database"] = {"file_path": str(db_path)}
             with open("config.ini", "w") as second_config_file:
                 config.write(second_config_file)

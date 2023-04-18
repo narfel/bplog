@@ -163,4 +163,4 @@ cython_debug/
 /backup_bplog.db
 /cov.bat
 cov.ps1
-bplog_pkg/bplog.db
+src/bplog_pkg/bplog.db
