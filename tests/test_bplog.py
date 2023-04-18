@@ -460,7 +460,7 @@ class TestDB_Path(unittest.TestCase):
         db_config = None
         return_val = __main__.get_db_path(db_config)
         self.assertEqual(return_val.name, "bplog.db")
-        self.assertEqual(return_val.parent.name, "bplog_pkg")
+        self.assertEqual(return_val.parent.name, "bplog")
 
     def test_config_read_exception(self):
         db_config = None
