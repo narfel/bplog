@@ -39,12 +39,6 @@ class TestConnectToDatabase(unittest.TestCase):
             db_temp_file.unlink()
         self.assertIsInstance(conn, sqlite3.Connection)
 
-    def test_connect_to_database_valueerror(self):
-        with patch("os.stat") as mock_stat:
-            with self.assertRaises(ValueError):
-                mock_stat.return_value = Mock(st_mode=0o444)
-                __main__.connect_to_database(0, "test_db_config")
-
     def test_connect_to_database_exception(self):
         with patch("sqlite3.connect") as mock_connect:
             mock_connect.side_effect = Exception("Test exception")

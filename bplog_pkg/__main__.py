@@ -329,8 +329,8 @@ def update_db_config(db_path: Path) -> None:
                     config.write(config_file)
         elif db_path != Path("bplog_pkg") / "bplog.db":
             config["Database"] = {"file_path": str(db_path)}
-            with open("config.ini", "w") as config_file_2:
-                config.write(config_file_2)
+            with open("config.ini", "w") as second_config_file:
+                config.write(second_config_file)
     except Exception as e:
         print(f"Error updating config file: {e}")
 
@@ -345,20 +345,11 @@ def connect_to_database(
         db_path = get_db_path(db_config)
         update_db_config(db_path)
         try:
-            if not db_path.exists():
-                conn = sqlite3.connect(db_path)
-                database_setup(conn)
-            elif db_path.stat().st_mode & 0o200:
-                conn = sqlite3.connect(db_path)
-                database_setup(conn)
-            else:
-                raise ValueError(f"File '{db_path}' is not writable")
-        except ValueError:
-            raise
+            conn = sqlite3.connect(db_path)
+            database_setup(conn)
         except Exception as e:
             print(f"Error connecting to database: {e}")
             raise
-            # conn = None
     return conn
 
 
