@@ -226,7 +226,7 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     )
     rows = cur.fetchall()
 
-    if rows == []:
+    if not rows:
         print("No data to plot")
         return
     dates_times = [
