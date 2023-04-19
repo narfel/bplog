@@ -136,3 +136,4 @@ cython_debug/
 /cov.bat
 cov.ps1
 src/bplog/bplog.db
+/.vscode/launch.json
