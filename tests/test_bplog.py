@@ -4,6 +4,7 @@ import argparse
 import configparser
 import csv
 import sqlite3
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
@@ -22,6 +23,13 @@ def setup_test_database():
     return conn
 
 
+def clean_files(*file_paths):
+    for file_path in file_paths:
+        filename = Path(file_path)
+        if filename.exists():
+            filename.unlink()
+
+
 class TestConnectToDatabase(unittest.TestCase):
     def test_connect_to_database(self):
         conn = __main__.connect_to_database(use_in_memory=True)
@@ -31,12 +39,7 @@ class TestConnectToDatabase(unittest.TestCase):
     def test_connect_to_database_else(self):
         conn = __main__.connect_to_database(use_in_memory=False, db_config="test.db")
         conn.close()
-        config_file = Path("config.ini")
-        db_temp_file = Path("test.db")
-        if config_file.exists():
-            config_file.unlink()
-        if db_temp_file.exists():
-            db_temp_file.unlink()
+        clean_files("config.ini", "test.db")
         self.assertIsInstance(conn, sqlite3.Connection)
 
     def test_connect_to_database_exception(self):
@@ -308,24 +311,23 @@ class TestExportToCsv(unittest.TestCase):
         conn = sqlite3.connect(":memory:")
         cur = conn.cursor()
         cur.execute(
-            "CREATE TABLE bplog (date text, time text, systolic integer, diastolic integer, comment text)",
+            "CREATE TABLE bplog (date text, time text, systolic integer,"
+            "diastolic integer, comment text)",
         )
         cur.execute(
             "INSERT INTO bplog VALUES ('2022-01-01', '12:00', 120, 80, 'test comment')",
         )
         conn.commit()
         __main__.export_to_csv(conn)
-        with open("bplog_database.csv", "r", newline="", encoding="utf-8") as f:
-            reader = csv.reader(f)
+        with open("bplog_database.csv", "r", newline="", encoding="utf-8") as csv_file:
+            reader = csv.reader(csv_file)
             header = next(reader)
             expected = list(reader)
         self.assertEqual(header, ["date", "time", "systolic", "diastolic", "comment"])
         self.assertEqual(
             expected, [["2022-01-01", "12:00", "120", "80", "test comment"]]
         )
-        csv_file = Path("bplog_database.csv")
-        if csv_file.exists():
-            csv_file.unlink()
+        clean_files("bplog_database.csv")
         conn.close()
 
 
@@ -350,17 +352,14 @@ class TestListAllRecords(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
         __main__.database_setup(self.conn)
-        self.conn.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+        sql_data = [
             ("2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
-        )
-        self.conn.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
             ("2020-03-03", "11:02", 122, 82, "Lorem Ipsum  2"),
-        )
-        self.conn.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
             ("2020-03-05", "11:03", 123, 83, "Lorem Ipsum 3"),
+        ]
+        self.conn.executemany(
+            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+            sql_data,
         )
 
     def tearDown(self) -> None:
@@ -386,33 +385,34 @@ class TestListAllRecords(unittest.TestCase):
 
         with patch("builtins.__import__", side_effect=import_mock):
             returned_str = __main__.list_all_records(self.conn)
-            expected_str = "2020-03-03\t11:01\t121:81\tLorem Ipsum\n2020-03-03\t11:02\t122:82\tLorem Ipsum  2\n2020-03-05\t11:03\t123:83\tLorem Ipsum 3"
+            expected_str = textwrap.dedent(
+                """\
+                2020-03-03\t11:01\t121:81\tLorem Ipsum
+                2020-03-03\t11:02\t122:82\tLorem Ipsum  2
+                2020-03-05\t11:03\t123:83\tLorem Ipsum 3"""
+            )
             self.assertEqual(returned_str, expected_str)
 
 
 class TestTableError(unittest.TestCase):
     def test_generate_table_error(self):
         conn = setup_test_database()
-        conn.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+        sql_data = [
             ("2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
-        )
-        conn.execute(
+            ("2020-03-03", "11:02", 122, 82, "Lorem Ipsum 2"),
+            ("2020-03-05", "11:03", 123, 83, None),
+        ]
+        conn.executemany(
             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
-            ("2020-03-03", "11:02", 122, 82, "Lorem Ipsum  2"),
+            sql_data,
         )
-        conn.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic) VALUES (?, ?, ?, ?)",
-            ("2020-03-05", "11:03", 123, 83),
-        )
-
         records = [
             (1, "2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
             (2, "2020-03-03", "11:02", 122, 82, "Lorem Ipsum  2"),
             (3, "2020-03-05", "11:03", 123, 83),
         ]
         with self.assertRaises(ValueError):
-            __main__.generate_table(records)
+            __main__.generate_list_table(records)
         conn.close()
 
 
@@ -434,19 +434,18 @@ class TestPlotFunc(unittest.TestCase):
             __main__.plot_blood_pressures(conn)
 
 
-class TestDB_Path(unittest.TestCase):
+class TestDatabasePath(unittest.TestCase):
     def test_reset_db_path_config(self):
-        # dummy config file
         config_file = Path("config.ini")
-        with open(config_file, "w") as f:
-            f.write("dummy content")
+        with open(config_file, "w", encoding="utf-8") as cfg:
+            cfg.write("dummy content")
         __main__.reset_db_path_config()
         self.assertFalse(config_file.exists())
 
     def test_get_db_path_string(self):
-        db_config = "daterbais"
+        db_config = "daterbeys"
         return_val = __main__.get_db_path(db_config)
-        self.assertEqual(return_val.name, "daterbais")
+        self.assertEqual(return_val.name, "daterbeys")
 
     def test_get_db_path_dot(self):
         db_config = "."
@@ -454,9 +453,7 @@ class TestDB_Path(unittest.TestCase):
         self.assertEqual(return_val.name, "bplog.db")
 
     def test_get_db_path_none(self):
-        config_file = Path("config.ini")
-        if config_file.exists():
-            config_file.unlink()  # pragma no cover
+        clean_files("config.ini")
         db_config = None
         return_val = __main__.get_db_path(db_config)
         self.assertEqual(return_val.name, "bplog.db")
@@ -478,7 +475,7 @@ class TestDBConfig(unittest.TestCase):
         config_data = "[Database]\nfile_path=old_db_path.db\n"
         with patch("builtins.open", mock_open(read_data=config_data)) as mock_open_func:
             __main__.update_db_config(db_path)
-            mock_open_func.assert_called_with("config.ini", "w")
+            mock_open_func.assert_called_with("config.ini", "w", encoding="utf-8")
             self.assertGreaterEqual(mock_open_func().write.call_count, 1)
             written_content = "".join(
                 [call.args[0] for call in mock_open_func().write.call_args_list]
@@ -503,13 +500,15 @@ class TestDBConfig(unittest.TestCase):
             with patch("configparser.ConfigParser.read", return_value=True):
                 with patch("builtins.open", new_callable=mock_open) as mock_file:
                     __main__.update_db_config(db_path)
-                    mock_file.assert_called_with("config.ini", "w")
+                    mock_file.assert_called_with("config.ini", "w", encoding="utf-8")
 
     def test_update_db_config_not_equal(self):
         with patch("configparser.ConfigParser.read", return_value="moo"):
             with patch("builtins.open", new_callable=mock_open) as mock_file:
                 db_path = "not_moo"
-                with open(__main__.update_db_config(db_path), "w") as tempfile:
+                with open(
+                    __main__.update_db_config(db_path), "w", encoding="utf-8"
+                ) as tempfile:
                     mock_file.return_value = tempfile
                     __main__.update_db_config(db_path)
 

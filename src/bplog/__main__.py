@@ -1,3 +1,4 @@
+"""Data logger for blood pressure data."""
 import argparse
 import configparser
 import csv
@@ -5,10 +6,17 @@ import datetime as dt
 import sqlite3
 import sys
 from pathlib import Path
-from typing import List
 
 
 def setup_cli_parser(args=None) -> argparse.Namespace:
+    """Create command line arguments for the cli.
+
+    Args:
+        args: None argument for unittests
+
+    Returns:
+        argparse.Namespace: args
+    """
     parser = argparse.ArgumentParser(
         description="Record and graph blood pressure measurements",
     )
@@ -16,7 +24,10 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
         "bp",
         nargs="?",
         action="store",
-        help="The blood pressure measurement to insert into the database separated by a colon (e.g. 120:80)",
+        help=(
+            "The blood pressure measurement to insert into the database "
+            "separated by a colon (e.g. 120:80)"
+        ),
     )
     parser.add_argument("--list", action="store_true", help="List all records")
     parser.add_argument(
@@ -73,11 +84,16 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
 
 
 def database_setup(conn: sqlite3.Connection) -> None:
+    """Set up the database.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+    """
     # create table if it doesn't exist
     cur = conn.cursor()
     cur.execute(
-        """CREATE TABLE IF NOT EXISTS bplog
-                (id INTEGER PRIMARY KEY, date TEXT, time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)""",
+        """CREATE TABLE IF NOT EXISTS bplog (id INTEGER PRIMARY KEY, date TEXT,
+        time TEXT, systolic INTEGER, diastolic INTEGER, comment TEXT)""",
     )
     # create an index on the date and time columns if it doesn't exist
     cur.execute(
@@ -87,6 +103,12 @@ def database_setup(conn: sqlite3.Connection) -> None:
 
 
 def delete_record(conn: sqlite3.Connection, record_id: str) -> None:
+    """Delete a record from the database.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        record_id (str): Identifier for the record
+    """
     sql = "DELETE FROM bplog WHERE id = ?"
     cur = conn.cursor()
     cur.execute(sql, (record_id,))
@@ -94,11 +116,17 @@ def delete_record(conn: sqlite3.Connection, record_id: str) -> None:
 
 
 def remove_measurement_by_date(conn: sqlite3.Connection, date: str) -> None:
+    """Remove a measurement by date.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        date (str): Date of the measurement to be deleted
+    """
     rows = get_record_by_date(conn, date)
     if not rows:
         print(f"No measurements found for {date}")
         return
-    elif len(rows) == 1:
+    if len(rows) == 1:
         delete_record(conn, rows[0][0])
         print(f"Measurement removed: {rows[0]}")
     else:
@@ -106,21 +134,28 @@ def remove_measurement_by_date(conn: sqlite3.Connection, date: str) -> None:
 
 
 def multiple_records(
-    rows: List[List[str]],
+    rows: list,
     date: str,
     conn: sqlite3.Connection,
 ) -> None:
+    """Handle the case if multiple records exist on a day.
+
+    Args:
+        rows (list): List of records on a certain date
+        date (str): Date of the measurement to be deleted
+        conn (sqlite3.Connection): Database connection handle
+    """
     print(f"{len(rows)} measurements found for {date}:")
     for row in rows:
         print(f"{row[1]} {row[2]} - {row[3]}:{row[4]}")
     bp_time = input("Enter time of the measurement to remove (HH:MM): ")
     found = False
-    for row in rows:
-        if row[2] == bp_time:
-            delete_record(conn, row[0])
+    for item in rows:
+        if item[2] == bp_time:
+            delete_record(conn, item[0])
             found = True
             print(
-                f"Measurement removed: {row[1]} {row[2]} - {row[3]}:{row[4]} (id:{row[0]})",
+                f"Measurement removed: {item[1]} {item[2]} - {item[3]}:{item[4]} (id:{item[0]})",
             )
             break
     if not found:
@@ -128,6 +163,15 @@ def multiple_records(
 
 
 def get_record_by_date(conn: sqlite3.Connection, date: str) -> list:
+    """Get a list of records matching date.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        date (str): Date to be searched
+
+    Returns:
+        list: List of measurements on date
+    """
     sql = "SELECT * FROM bplog WHERE date(date) = ? ORDER BY time"
     cur = conn.cursor()
     cur.execute(sql, (date,))
@@ -135,6 +179,11 @@ def get_record_by_date(conn: sqlite3.Connection, date: str) -> list:
 
 
 def delete_last_record_added(conn: sqlite3.Connection) -> None:
+    """Delete the last record that was added to the database .
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+    """
     cur = conn.cursor()
     cur.execute("SELECT * FROM bplog WHERE id = (SELECT MAX(id) FROM bplog)")
     deleted_record = cur.fetchone()
@@ -143,10 +192,18 @@ def delete_last_record_added(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def parse_date_and_blood_pressure(args: argparse.Namespace) -> tuple[int, int, str]:
-    bp = args.bp.split(":")
-    systolic = int(bp[0])
-    diastolic = int(bp[1])
+def parse_date_and_blood_pressure(args: argparse.Namespace) -> tuple:
+    """Parse the measurement data from args.
+
+    Args:
+        args (argparse.Namespace): CLI arguments
+
+    Returns:
+        tuple: Tuple containing systolic, diastolic and date
+    """
+    measurement = args.bp.split(":")
+    systolic = int(measurement[0])
+    diastolic = int(measurement[1])
 
     date_format = "%d,%m,%Y"
     date_str = args.date or dt.datetime.now().strftime(date_format)
@@ -165,7 +222,15 @@ def add_measurement(
     diastolic: int,
     date_str: str,
 ) -> None:
-    """Add measurements to the database."""
+    """Add a new blood pressure measurement .
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+        systolic (int): Numeric systolic value
+        diastolic (int): Numeric diastolic value
+        date_str (str): Date of measurement
+    """
     cur = conn.cursor()
     time_str = args.time or dt.datetime.now().strftime("%H:%M")
     comment = args.comment or ""
@@ -180,12 +245,32 @@ def add_measurement(
 
 
 def get_all_records(conn: sqlite3.Connection) -> list:
+    """Return list of all records in the database.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+
+    Returns:
+        list: List of all records in the database
+    """
     cur = conn.cursor()
     cur.execute("SELECT * FROM bplog ORDER BY date, time")
     return cur.fetchall()
 
 
-def generate_table(records) -> str:
+def generate_list_table(records: list) -> str:
+    """Generate a pretty table from a list of dictionaries .
+
+    Args:
+        records (list): All records in list form
+
+    Raises:
+        ValueError: If the record does not containg 6 values
+        (id, date, time, systolic, diastolic, comment)
+
+    Returns:
+        str: Return string either in raw or in prettytable format
+    """
     try:
         from prettytable import PrettyTable
 
@@ -193,26 +278,39 @@ def generate_table(records) -> str:
         for record in records:
             if len(record) != 6:
                 raise ValueError(f"Unexpected row format: {record}")
-            bp = f"{record[3]}:{record[4]}"
-            table.add_row([record[1], record[2], bp, record[5]])
+            bloodpressure = f"{record[3]}:{record[4]}"
+            table.add_row([record[1], record[2], bloodpressure, record[5]])
         return str(table)
     except ImportError:
         # If prettytable is not installed, generate the table without pretty formatting
         output = []
         for record in records:
-            bp = f"{record[3]}:{record[4]}"
-            output.append(f"{record[1]}\t{record[2]}\t{bp}\t{record[5]}")
+            bloodpressure = f"{record[3]}:{record[4]}"
+            output.append(f"{record[1]}\t{record[2]}\t{bloodpressure}\t{record[5]}")
         return "\n".join(output)
 
 
 def list_all_records(conn: sqlite3.Connection) -> str:
+    """Gather all records in a list.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+
+    Returns:
+        str: Formatted table
+    """
     records = get_all_records(conn)
-    table = generate_table(records)
+    table = generate_list_table(records)
     conn.close()
     return table
 
 
 def plot_blood_pressures(conn: sqlite3.Connection) -> None:
+    """Plot blood pressure data if matplotlib is installed.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+    """
     try:
         from matplotlib import colormaps
         from matplotlib import pyplot as plt
@@ -242,14 +340,16 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     times = [dt.datetime.strptime(str(row[1]), "%H:%M").time() for row in rows]
     time_indices = [(t.hour * 60 + t.minute) / (24 * 60) for t in times]
 
-    fig, ax = plt.subplots()
-    ax.plot(dates_times, systolics, "-o", color="red", zorder=0, label="systolic")
-    ax.plot(dates_times, diastolics, "-o", color="blue", zorder=0, label="diastolic")
+    fig, axes = plt.subplots()
+    axes.plot(dates_times, systolics, "-o", color="red", zorder=0, label="systolic")
+    axes.plot(dates_times, diastolics, "-o", color="blue", zorder=0, label="diastolic")
 
-    sc = ax.scatter(dates_times, systolics, c=time_indices, cmap=cmap, vmin=0, vmax=1)
-    ax.scatter(dates_times, diastolics, c=time_indices, cmap=cmap, vmin=0, vmax=1)
+    plot = axes.scatter(
+        dates_times, systolics, c=time_indices, cmap=cmap, vmin=0, vmax=1
+    )
+    axes.scatter(dates_times, diastolics, c=time_indices, cmap=cmap, vmin=0, vmax=1)
 
-    cbar = fig.colorbar(sc)
+    cbar = fig.colorbar(plot)
     cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
     cbar.set_ticklabels(["0:00", "06:00", "12:00", "18:00", "0:00"])
     cbar.set_label("Time of day")
@@ -282,16 +382,29 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
         plt.show()  # pragma: no cover
 
 
-def export_to_csv(conn) -> None:
+def export_to_csv(conn: sqlite3.Connection) -> None:
+    """Export the database to csv.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+    """
     cur = conn.cursor()
     data = cur.execute("SELECT * FROM bplog")
-    with open("bplog_database.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+    with open("bplog_database.csv", "w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
         writer.writerow(["date", "time", "systolic", "diastolic", "comment"])
         writer.writerows(data)
 
 
 def get_db_path(db_config: str = None) -> Path:
+    """Get the database path from config file.
+
+    Args:
+        db_config (str): Argument holding config path if provided. Defaults to None.
+
+    Returns:
+        Path: Path to the database
+    """
     if db_config is None:
         config = configparser.ConfigParser()
         try:
@@ -301,8 +414,8 @@ def get_db_path(db_config: str = None) -> Path:
                 if "Database" in config and "file_path" in config["Database"]
                 else str(Path("src") / "bplog" / "bplog.db")
             )
-        except Exception as e:
-            print(f"Error reading config file: {e}")
+        except configparser.Error as parse_error:
+            print(f"Error reading config file: {parse_error}")
             db_file_path = str(Path("src") / "bplog" / "bplog.db")
         return Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
     elif db_config == ".":
@@ -312,6 +425,11 @@ def get_db_path(db_config: str = None) -> Path:
 
 
 def update_db_config(db_path: Path) -> None:
+    """Update the configuration of a database .
+
+    Args:
+        db_path (Path): [description]
+    """
     config = configparser.ConfigParser()
     try:
         if (
@@ -321,20 +439,32 @@ def update_db_config(db_path: Path) -> None:
         ):
             if db_path != config["Database"]["file_path"]:
                 config.set("Database", "file_path", str(db_path))
-                with open("config.ini", "w") as config_file:
+                with open("config.ini", "w", encoding="utf-8") as config_file:
                     config.write(config_file)
         elif db_path != Path("src") / "bplog" / "bplog.db":
             config["Database"] = {"file_path": str(db_path)}
-            with open("config.ini", "w") as second_config_file:
+            with open("config.ini", "w", encoding="utf-8") as second_config_file:
                 config.write(second_config_file)
-    except Exception as e:
-        print(f"Error updating config file: {e}")
+    except (configparser.Error, IOError) as config_error:
+        print(f"Error updating config file: {config_error}")
 
 
 def connect_to_database(
     use_in_memory: bool,
     db_config: str = None,
 ) -> sqlite3.Connection:
+    """Connect to the database.
+
+    Args:
+        use_in_memory (bool): Use an in-memory database for unittesting
+        db_config (str): Argument holding config path if provided. Defaults to None.
+
+    Raises:
+        Exception: If any exception occurs connnecting to the database
+
+    Returns:
+        sqlite3.Connection: Database connection handle
+    """
     if use_in_memory:
         conn = sqlite3.connect(":memory:")
     else:
@@ -343,52 +473,116 @@ def connect_to_database(
         try:
             conn = sqlite3.connect(db_path)
             database_setup(conn)
-        except Exception as e:
-            print(f"Error connecting to database: {e}")
+        except Exception as conn_error:
+            print(f"Error connecting to database: {conn_error}")
             raise
     return conn
 
 
-def reset_db_path_config():
+def reset_db_path_config() -> None:
+    """Remove config.ini file."""
     config_file = Path("config.ini")
     if config_file.exists():
         config_file.unlink()
 
 
-def handle_reset_config(conn, args):
+def handle_reset_config(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle a reset of the database path configuration and exit.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     reset_db_path_config()
     sys.exit(0)
 
 
-def handle_remove_last_record(conn, args):
+def handle_remove_last_record(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle remove last record from the database.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     delete_last_record_added(conn)
 
 
-def handle_remove_measurement(conn, args):
+def handle_remove_measurement(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle remove measurement from database.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     date = input("Enter date of measurement to remove (YYYY-MM-DD): ")
     remove_measurement_by_date(conn, date)
 
 
-def handle_list_records(conn, args):
+def handle_list_records(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle printing a list of records to the console.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     print(list_all_records(conn))
     sys.exit(0)
 
 
-def handle_export_to_csv(conn, args):
+def handle_export_to_csv(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle export_to_csv.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     export_to_csv(conn)
 
 
-def handle_add_measurement(conn, args):
+def handle_add_measurement(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle adding a measurement to the database.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     systolic, diastolic, date_str = parse_date_and_blood_pressure(args)
     add_measurement(conn, args, systolic, diastolic, date_str)
 
 
-def handle_plot_blood_pressures(conn, args):
+def handle_plot_blood_pressures(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+) -> None:
+    """Handle plotting a blood pressure graph.
+
+    Args:
+        conn (sqlite3.Connection): Database connection handle
+        args (argparse.Namespace): CLI arguments
+    """
     plot_blood_pressures(conn)
     sys.exit(0)
 
 
-handlers = {
+handlers: dict = {
     "reset_config": handle_reset_config,
     "rl": handle_remove_last_record,
     "rm": handle_remove_measurement,
@@ -399,6 +593,7 @@ handlers = {
 
 
 def main() -> None:  # pragma: no cover
+    """Set main entry point for bplog."""
     args = setup_cli_parser()
 
     if args.config:

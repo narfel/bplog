@@ -8,51 +8,48 @@ version = "0.0.1"
 description = "Simple cli data logger for blood pressure data"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 keywords = ["data logger", "blood pressure"]
-authors = [
-  {email = "narfelchen@gmail.com"},
-  {name = "Narfelchen"}
-]
-maintainers = [
-  {name = "Narfelchen", email = "narfelchen@gmail.com"}
-]
+authors = [{ email = "narfelchen@gmail.com" }, { name = "Narfelchen" }]
+maintainers = [{ name = "Narfelchen", email = "narfelchen@gmail.com" }]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent"
+  "Operating System :: OS Independent",
 ]
 
 [project.urls]
 "Repository" = "https://github.com/pypa/sampleproject"
 
 [tool.setuptools.packages.find]
-where = [ "." ]
-exclude = [ "tests" ]
+where = ["."]
+exclude = ["tests"]
 
 [project.optional-dependencies]
-test = [
-  "matplotlib",
-  "prettytables"
-]
+test = ["matplotlib", "prettytables"]
 
 [project.scripts]
 bplog = "src.bplog.__main__:main"
 
-[flake8]
-ignore = [ "WPS202", "E501", "WPS421" ]
-
-[mypy]
-ignore_missing_imports = [ "True" ]
-check_untyped_defs = [ "True" ]
-
-[coverage.run]
-omit = [ " tests/test_bplog.py " ]
-
 [tool.pytest.ini_options]
-# ignore matplotlib warning about agg backend
-filterwarnings = [
-    "error",
-    "ignore::UserWarning",
+filterwarnings = ["error", "ignore::UserWarning"]
+
+[tool.mypy]
+ignore_missing_imports = ["true"]
+check_untyped_defs = ["true"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [" tests/test_bplog.py "]
+
+[tool.black]
+line-length = 88
+
+[tool.pylint.'MESSAGES CONTROL']
+disable = [
+  "unused-argument",
+  "import-outside-toplevel",
+  "missing-function-docstring",
+  "missing-class-docstring",
 ]
