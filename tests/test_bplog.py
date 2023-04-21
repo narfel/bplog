@@ -462,7 +462,7 @@ class TestDatabasePath(unittest.TestCase):
     def test_config_read_exception(self):
         db_config = None
         with patch(
-            "configparser.ConfigParser.read", side_effect=Exception("Mock exception")
+            "configparser.ConfigParser.read", side_effect=configparser.Error("Mock exception")
         ):
             with self.assertRaises(Exception) as context:
                 __main__.get_db_path(db_config)
@@ -486,7 +486,7 @@ class TestDBConfig(unittest.TestCase):
 
     def test_update_db_config_raise(self):
         with patch(
-            "configparser.ConfigParser.read", side_effect=Exception("Mock exception")
+            "configparser.ConfigParser.read", side_effect=configparser.Error("Mock exception")
         ):
             with self.assertRaises(Exception) as context:
                 db_path = "moo"
