@@ -30,7 +30,7 @@ exclude = ["tests"]
 test = ["matplotlib", "prettytables"]
 
 [project.scripts]
-bplog = "src.bplog.__main__:main"
+bplog = "src.bplog.app:main"
 
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::UserWarning"]
