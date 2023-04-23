@@ -1,4 +1,4 @@
-"""Data logger for blood pressure data."""
+"""Simple data logger for blood pressure data."""
 import argparse
 import configparser
 import csv
@@ -12,7 +12,7 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
     """Create command line arguments for the cli.
 
     Args:
-        args: None argument for unittests
+        args: None argument is used in for unittests
 
     Returns:
         argparse.Namespace: args
@@ -24,20 +24,28 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
         "bp",
         nargs="?",
         action="store",
-        help=(
-            "The blood pressure measurement to insert into the database "
-            "separated by a colon (e.g. 120:80)"
-        ),
+        help=("Blood pressure measurement " "separated by a colon (e.g. 120:80)"),
     )
-    parser.add_argument("--list", action="store_true", help="List all records")
     parser.add_argument(
-        "--date",
+        "-c",
+        dest="comment",
+        type=str,
+        default=None,
+        help="Add a comment to the measurement",
+    )
+    parser.add_argument(
+        "-l", dest="list", action="store_true", help="List all records on the terminal"
+    )
+    parser.add_argument(
+        "-d",
+        dest="date",
         type=str,
         default=None,
         help='Specify the date of measurement in the form "YYYY-MM-DD" (default: today)',
     )
     parser.add_argument(
-        "--time",
+        "-t",
+        dest="time",
         type=str,
         default=None,
         help='Specify the time of measurement in the form "HH:MM" (default: current time)',
@@ -50,32 +58,26 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
     parser.add_argument(
         "-rl",
         action="store_true",
-        help="Remove last measurement added",
+        help="Remove the last measurement added",
     )
     parser.add_argument(
-        "--comment",
-        type=str,
-        default=None,
-        help="Add a comment for the measurement",
-    )
-    parser.add_argument(
-        "--in-memory",
+        "-in-memory",
         action="store_true",
-        help="Use an in-memory database (for testing)",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "--csv",
+        "-csv",
         action="store_true",
         help="Export database to csv",
     )
     parser.add_argument(
-        "--config",
+        "-config",
         type=str,
         default=None,
         help="Path to configuration file",
     )
     parser.add_argument(
-        "--reset_config",
+        "-reset_config",
         action="store_true",
         help="Reset the config path",
     )
@@ -205,10 +207,14 @@ def parse_date_and_blood_pressure(args: argparse.Namespace) -> tuple:
     systolic = int(measurement[0])
     diastolic = int(measurement[1])
 
-    date_format = "%d,%m,%Y"
-    date_str = args.date or dt.datetime.now().strftime(date_format)
+    date_format_1 = "%d,%m,%Y"
+    date_format_2 = "%Y-%m-%d"
+    date_str = args.date or dt.datetime.now().strftime(date_format_1)
 
-    date_obj = dt.datetime.strptime(date_str, date_format)
+    try:
+        date_obj = dt.datetime.strptime(date_str, date_format_1)
+    except ValueError:
+        date_obj = dt.datetime.strptime(date_str, date_format_2)
 
     db_date_format = "%Y-%m-%d"
     db_date_str = date_obj.strftime(db_date_format)

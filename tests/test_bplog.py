@@ -123,14 +123,14 @@ class TestCLIParser(unittest.TestCase):
             [
                 "bplog",
                 "120:80",
-                "--date",
+                "-d",
                 "2023-12-12",
-                "--time",
+                "-t",
                 "11:11",
                 "-rm",
                 "-rl",
-                "--comment",
-                "moin",
+                "-c",
+                "test",
             ],
         ):
             test_args = app.setup_cli_parser()
@@ -140,7 +140,7 @@ class TestCLIParser(unittest.TestCase):
         self.assertEqual(test_args.time, "11:11")
         self.assertTrue(test_args.rm)
         self.assertTrue(test_args.rl)
-        self.assertEqual(test_args.comment, "moin")
+        self.assertEqual(test_args.comment, "test")
 
 
 class TestDatabaseSetup(unittest.TestCase):
@@ -340,9 +340,16 @@ class TestNoData(unittest.TestCase):
 
 
 class TestParsing(unittest.TestCase):
-    def test_parse_date_and_blood_pressure(self):
+    def test_parse_date_and_blood_pressure_year1(self):
         setup_test_database()
         mock_args = {"bp": "09:50", "date": "02,02,2020"}
+        args = argparse.Namespace(**mock_args)
+        returned_values = app.parse_date_and_blood_pressure(args)
+        self.assertEqual(returned_values, (9, 50, "2020-02-02"))
+
+    def test_parse_date_and_blood_pressure_year2(self):
+        setup_test_database()
+        mock_args = {"bp": "09:50", "date": "2020-02-02"}
         args = argparse.Namespace(**mock_args)
         returned_values = app.parse_date_and_blood_pressure(args)
         self.assertEqual(returned_values, (9, 50, "2020-02-02"))
@@ -462,7 +469,8 @@ class TestDatabasePath(unittest.TestCase):
     def test_config_read_exception(self):
         db_config = None
         with patch(
-            "configparser.ConfigParser.read", side_effect=configparser.Error("Mock exception")
+            "configparser.ConfigParser.read",
+            side_effect=configparser.Error("Mock exception"),
         ):
             with self.assertRaises(Exception) as context:
                 app.get_db_path(db_config)
@@ -486,7 +494,8 @@ class TestDBConfig(unittest.TestCase):
 
     def test_update_db_config_raise(self):
         with patch(
-            "configparser.ConfigParser.read", side_effect=configparser.Error("Mock exception")
+            "configparser.ConfigParser.read",
+            side_effect=configparser.Error("Mock exception"),
         ):
             with self.assertRaises(Exception) as context:
                 db_path = "moo"
