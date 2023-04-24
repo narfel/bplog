@@ -25,7 +25,7 @@ or pip install --prefix=~/.local -e .
 Positional arguments
 
 ```
-XXX:XX              Measurement separated by a colon (e.g. 120:80)
+123:45             Measurement separated by a colon (e.g. 120:80)
 ```
 
 Optional arguments

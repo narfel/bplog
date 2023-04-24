@@ -461,6 +461,11 @@ class TestPlotFunc(unittest.TestCase):
     @patch.dict("sys.modules", {"matplotlib": None})
     def test_plot_blood_pressures_sysexit(self):
         conn = setup_test_database()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+            ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
+        )
         with self.assertRaises(SystemExit):
             app.plot_blood_pressures(conn)
 

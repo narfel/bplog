@@ -137,3 +137,4 @@ cython_debug/
 cov.ps1
 src/bplog/bplog.db
 /.vscode/launch.json
+/todo.txt

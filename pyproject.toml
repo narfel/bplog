@@ -10,8 +10,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = ["data logger", "blood pressure"]
-authors = [{ email = "narfelchen@gmail.com" }, { name = "Narfelchen" }]
-maintainers = [{ name = "Narfelchen", email = "narfelchen@gmail.com" }]
+authors = [{ email = "narfelchen@gmail.com" }, { name = "Narfel" }]
+maintainers = [{ name = "Narfel", email = "narfelchen@gmail.com" }]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3",
@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [project.urls]
-"Repository" = "https://github.com/pypa/sampleproject"
+"Repository" = "https://github.com/narfel/bplog"
 
 [tool.setuptools.packages.find]
 where = ["."]

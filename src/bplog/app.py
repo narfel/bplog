@@ -346,6 +346,7 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
         from matplotlib import pyplot as plt
         from matplotlib.lines import Line2D
     except ImportError:
+        print(list_all_records(conn))
         sys.exit()
 
     cur = conn.cursor()
