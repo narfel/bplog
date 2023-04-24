@@ -7,7 +7,7 @@ Simple data logger to log blood pressure measurements from the terminal
 
 ## Background
 
-> Quickly store blood pressure values from the terminal. Values are stored in a sqlite3 database and can be exported to csv, listed on the terminal or plotted with matplotlib.
+> Quickly store blood pressure values from the terminal. Values are stored in a sqlite3 database and can be listed on the terminal, exported to csv or plotted with matplotlib if it is installed.
 
 ## Installation
 
@@ -17,18 +17,18 @@ Open a terminal and type
 git clone https://github.com/....git
 cd bplog
 pip install bplog .
-or pip install --prefix=~/.local -e ."
+or pip install --prefix=~/.local -e .
 ```
 
 ## How to use
 
-### Positional arguments
+Positional arguments
 
 ```
 XXX:XX              Measurement separated by a colon (e.g. 120:80)
 ```
 
-### Optional arguments
+Optional arguments
 
 ```
 
@@ -56,21 +56,20 @@ Add the values 120:80 as a record with the comment "after workout"
 Add the same values as a record with a specified time and date
 ~$ bplog 120:80 -d 2023-04-23 -t 00:00
 
-~$ bplog -config .
 Create a new database at the current directory
+~$ bplog -config .
 ```
 
 ## Dependencies
 
 None by default, but optionally:
 
-* [**prettytable>=3.7.0**](https://pypi) (to format listing on the terminal)
+* [**prettytable>=3.7.0**](https://pypi) (to prettify listing on the terminal)
 * [**matplotlib>=3.7.1**](https://pypi) (for plotting a graph of the measurements)
 
 ## Bugs
 
 If you have questions, feature requests or a bug you want to report, please click [here](https://github.com/.../issues) to file an issue.
-
 
 Copyright (c) 2023 Narfel.
 

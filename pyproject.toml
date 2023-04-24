@@ -34,14 +34,43 @@ bplog = "src.bplog.app:main"
 
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::UserWarning"]
+addopts = "--cov"
+testpaths = ["tests/test_bplog.py"]
 
 [tool.mypy]
-ignore_missing_imports = ["true"]
-check_untyped_defs = ["true"]
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true
 
-[tool.coverage.run]
-source = ["src"]
-omit = [" tests/test_bplog.py "]
+[[tool.mypy.overrides]]
+module = ["matplotlib", "matplotlib.lines", "prettytable"]
+ignore_missing_imports = true
+
+[tool.tox]
+legacy_tox_ini = """
+    [tox]
+    min_version = 4.0
+    env_list =
+        py311
+        py39
+        py38
+        type
+    skipsdist = True
+
+    [testenv]
+    deps =
+        matplotlib
+        prettytable
+        pytest
+        pytest-cov
+        mypy
+
+    commands = python -m pytest
+
+    [testenv:type]
+    deps = mypy
+    commands = mypy src
+"""
 
 [tool.black]
 line-length = 88

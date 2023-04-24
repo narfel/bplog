@@ -426,7 +426,7 @@ def export_to_csv(conn: sqlite3.Connection) -> None:
         writer.writerows(data)
 
 
-def get_db_path(db_config: str = None) -> Path:
+def get_db_path(db_config: str = "") -> Path:
     """Get the database path from config file.
 
     Args:
@@ -435,7 +435,7 @@ def get_db_path(db_config: str = None) -> Path:
     Returns:
         Path: Path to the database
     """
-    if db_config is None:
+    if not db_config:
         config = configparser.ConfigParser()
         try:
             config.read("config.ini")
@@ -481,7 +481,7 @@ def update_db_config(db_path: Path) -> None:
 
 def connect_to_database(
     use_in_memory: bool,
-    db_config: str = None,
+    db_config: str = "",
 ) -> sqlite3.Connection:
     """Connect to the database.
 
