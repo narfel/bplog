@@ -267,6 +267,8 @@ def get_all_records(conn: sqlite3.Connection) -> list:
 def generate_list_table(records: list) -> str:
     """Generate a pretty table from a list of dictionaries .
 
+    If prettytable is not installed, generate the table without pretty formatting
+
     Args:
         records (list): All records in list form
 
@@ -277,22 +279,44 @@ def generate_list_table(records: list) -> str:
     Returns:
         str: Return string either in raw or in prettytable format
     """
+    sum_dia_values = 0
+    sum_sys_values = 0
     try:
         from prettytable import PrettyTable
 
         table = PrettyTable(["Date", "Time", "Blood Pressure", "Comment"])
-        for record in records:
+        for index, record in enumerate(records):
             if len(record) != 6:
                 raise ValueError(f"Unexpected row format: {record}")
             bloodpressure = f"{record[3]}:{record[4]}"
-            table.add_row([record[1], record[2], bloodpressure, record[5]])
+            sum_sys_values = sum_sys_values + record[3]
+            sum_dia_values = sum_dia_values + record[4]
+            if index == len(records) - 1:
+                table.add_row(
+                    [record[1], record[2], bloodpressure, record[5]], divider=True
+                )
+            else:
+                table.add_row([record[1], record[2], bloodpressure, record[5]])
+        avg_sys = round(sum_sys_values / len(records))
+        avg_dia = round(sum_dia_values / len(records))
+
+        table.add_row(
+            ["Records", len(records), "Average", f"{avg_sys}:{avg_dia}"], divider=True
+        )
         return str(table)
-    except ImportError:
-        # If prettytable is not installed, generate the table without pretty formatting
+    except ImportError as import_error:
         output = []
         for record in records:
+            if len(record) != 6:
+                raise ValueError(f"Unexpected row format: {record}") from import_error
             bloodpressure = f"{record[3]}:{record[4]}"
+            sum_sys_values = sum_sys_values + record[3]
+            sum_dia_values = sum_dia_values + record[4]
             output.append(f"{record[1]}\t{record[2]}\t{bloodpressure}\t{record[5]}")
+        avg_sys = round(sum_sys_values / len(records))
+        avg_dia = round(sum_dia_values / len(records))
+        output.append(f"Records: {len(records)}, Average: {avg_sys}:{avg_dia}")
+
         return "\n".join(output)
 
 

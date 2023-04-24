@@ -396,13 +396,14 @@ class TestListAllRecords(unittest.TestCase):
                 """\
                 2020-03-03\t11:01\t121:81\tLorem Ipsum
                 2020-03-03\t11:02\t122:82\tLorem Ipsum  2
-                2020-03-05\t11:03\t123:83\tLorem Ipsum 3"""
+                2020-03-05\t11:03\t123:83\tLorem Ipsum 3
+                Records: 3, Average: 122:82"""
             )
             self.assertEqual(returned_str, expected_str)
 
 
 class TestTableError(unittest.TestCase):
-    def test_generate_table_error(self):
+    def test_generate_table_error_prettytable(self):
         conn = setup_test_database()
         sql_data = [
             ("2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
@@ -420,6 +421,29 @@ class TestTableError(unittest.TestCase):
         ]
         with self.assertRaises(ValueError):
             app.generate_list_table(records)
+        conn.close()
+
+    def test_generate_table_error_no_prettytable(self):
+        conn = setup_test_database()
+        sql_data = [
+            ("2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
+            ("2020-03-03", "11:02", 122, 82, "Lorem Ipsum 2"),
+            ("2020-03-05", "11:03", 123, 83, None),
+        ]
+        conn.executemany(
+            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+            sql_data,
+        )
+        records = [
+            (1, "2020-03-03", "11:01", 121, 81, "Lorem Ipsum"),
+            (2, "2020-03-03", "11:02", 122, 82, "Lorem Ipsum  2"),
+            (3, "2020-03-05", "11:03", 123, 83),
+        ]
+
+        import_mock = Mock(side_effect=ImportError)
+        with patch("builtins.__import__", side_effect=import_mock):
+            with self.assertRaises(ValueError):
+                app.generate_list_table(records)
         conn.close()
 
 
