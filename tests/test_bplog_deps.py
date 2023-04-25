@@ -17,7 +17,7 @@ def setup_test_database():
     return conn
 
 
-class TestPlotFunc(unittest.TestCase):
+class TestPlotFunction(unittest.TestCase):
     def test_plot_blood_pressures_data(self):
         conn = setup_test_database()
         cur = conn.cursor()
