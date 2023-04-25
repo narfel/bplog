@@ -330,6 +330,10 @@ def list_all_records(conn: sqlite3.Connection) -> str:
         str: Formatted table
     """
     records = get_all_records(conn)
+    if not records:
+        connect_to_database(use_in_memory = False)
+        print("No data to list")
+
     table = generate_list_table(records)
     conn.close()
     return table
@@ -431,7 +435,7 @@ def get_db_path(db_config: str = "") -> Path:
     """Get the database path from config file.
 
     Args:
-        db_config (str): Argument holding config path if provided. Defaults to None.
+        db_config (str): Argument holding config path if provided. Defaults to an empty string.
 
     Returns:
         Path: Path to the database
@@ -488,7 +492,7 @@ def connect_to_database(
 
     Args:
         use_in_memory (bool): Use an in-memory database for unittesting
-        db_config (str): Argument holding config path if provided. Defaults to None.
+        db_config (str): Argument holding config path if provided. Defaults to an empty string.
 
     Raises:
         Exception: If any exception occurs connnecting to the database

@@ -5,7 +5,7 @@
 
 Simple data logger to log blood pressure measurements from the terminal
 
-## Background
+## Description
 
 > Quickly store blood pressure values from the terminal. Values are stored in a sqlite3 database and can be listed on the terminal, exported to csv or plotted with matplotlib if it is installed.
 
