@@ -54,7 +54,8 @@ legacy_tox_ini = """
         py311
         py39
         py38
-        type
+        mypy
+        pylint
     skipsdist = True
 
     [testenv]
@@ -64,12 +65,18 @@ legacy_tox_ini = """
         pytest
         pytest-cov
         mypy
+        pylint
 
-    commands = python -m pytest
+    commands = pytest src
 
-    [testenv:type]
+    [testenv:mypy]
     deps = mypy
     commands = mypy src
+
+    [testenv:pylint]
+    deps = pylint
+    commands = pylint src
+
 """
 
 [tool.black]
@@ -81,4 +88,5 @@ disable = [
   "import-outside-toplevel",
   "missing-function-docstring",
   "missing-class-docstring",
+  "no-else-return",
 ]

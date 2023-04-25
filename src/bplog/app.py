@@ -34,7 +34,10 @@ def setup_cli_parser(args=None) -> argparse.Namespace:
         help="Add a comment to the measurement",
     )
     parser.add_argument(
-        "-l", dest="list", action="store_true", help="List all records on the terminal"
+        "-l",
+        dest="list",
+        action="store_true",
+        help="List all records on the terminal",
     )
     parser.add_argument(
         "-d",
@@ -265,22 +268,6 @@ def get_all_records(conn: sqlite3.Connection) -> list:
 
 
 def generate_list_table(records: list) -> str:
-    """Generate a pretty table from a list of dictionaries .
-
-    If prettytable is not installed, generate the table without pretty formatting
-
-    Args:
-        records (list): All records in list form
-
-    Raises:
-        ValueError: If the record does not containg 6 values
-        (id, date, time, systolic, diastolic, comment)
-
-    Returns:
-        str: Return string either in raw or in prettytable format
-    """
-    sum_dia_values = 0
-    sum_sys_values = 0
     try:
         from prettytable import PrettyTable
 
@@ -289,19 +276,18 @@ def generate_list_table(records: list) -> str:
             if len(record) != 6:
                 raise ValueError(f"Unexpected row format: {record}")
             bloodpressure = f"{record[3]}:{record[4]}"
-            sum_sys_values = sum_sys_values + record[3]
-            sum_dia_values = sum_dia_values + record[4]
             if index == len(records) - 1:
                 table.add_row(
-                    [record[1], record[2], bloodpressure, record[5]], divider=True
+                    [record[1], record[2], bloodpressure, record[5]],
+                    divider=True,
                 )
             else:
                 table.add_row([record[1], record[2], bloodpressure, record[5]])
-        avg_sys = round(sum_sys_values / len(records))
-        avg_dia = round(sum_dia_values / len(records))
+        avg_sys, avg_dia = calc_averages(records)
 
         table.add_row(
-            ["Records", len(records), "Average", f"{avg_sys}:{avg_dia}"], divider=True
+            ["Records", len(records), "Average", f"{avg_sys}:{avg_dia}"],
+            divider=True,
         )
         return str(table)
     except ImportError as import_error:
@@ -310,14 +296,17 @@ def generate_list_table(records: list) -> str:
             if len(record) != 6:
                 raise ValueError(f"Unexpected row format: {record}") from import_error
             bloodpressure = f"{record[3]}:{record[4]}"
-            sum_sys_values = sum_sys_values + record[3]
-            sum_dia_values = sum_dia_values + record[4]
             output.append(f"{record[1]}\t{record[2]}\t{bloodpressure}\t{record[5]}")
-        avg_sys = round(sum_sys_values / len(records))
-        avg_dia = round(sum_dia_values / len(records))
+        avg_sys, avg_dia = calc_averages(records)
         output.append(f"Records: {len(records)}, Average: {avg_sys}:{avg_dia}")
 
         return "\n".join(output)
+
+
+def calc_averages(records):
+    avg_sys = round(sum(record[3] for record in records) / len(records))
+    avg_dia = round(sum(record[4] for record in records) / len(records))
+    return avg_sys, avg_dia
 
 
 def list_all_records(conn: sqlite3.Connection) -> str:
@@ -333,7 +322,7 @@ def list_all_records(conn: sqlite3.Connection) -> str:
     if not records:
         connect_to_database(use_in_memory=False)
         print("No data to list")
-        return
+        return ""
 
     table = generate_list_table(records)
     conn.close()
@@ -341,11 +330,7 @@ def list_all_records(conn: sqlite3.Connection) -> str:
 
 
 def plot_blood_pressures(conn: sqlite3.Connection) -> None:
-    """Plot blood pressure data if matplotlib is installed.
-
-    Args:
-        conn (sqlite3.Connection): Database connection handle
-    """
+    # pylint: disable=too-many-locals
     try:
         from matplotlib import colormaps
         from matplotlib import pyplot as plt
@@ -407,12 +392,14 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
     plt.ylabel("Blood Pressure (mmHg)")
     plt.title("Blood Pressure over Time")
 
-    custom_lines = [
-        Line2D([0], [0], color="black", linestyle=":"),
-        Line2D([0], [0], color="red", linestyle=":"),
-        Line2D([0], [0], color="green", linestyle="--"),
-    ]
-    plt.legend(custom_lines, ["normal", "prehypertension", "average"])
+    plt.legend(
+        [
+            Line2D([0], [0], color="black", linestyle=":"),
+            Line2D([0], [0], color="red", linestyle=":"),
+            Line2D([0], [0], color="green", linestyle="--"),
+        ],
+        ["normal", "prehypertension", "average"],
+    )
 
     # don't run if non-GUI backend is used during testing
     if plt.get_backend() != "agg":

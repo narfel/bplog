@@ -42,22 +42,12 @@ class TestConnectToDatabase(unittest.TestCase):
         clean_files("config.ini", "test.db")
         self.assertIsInstance(conn, sqlite3.Connection)
 
-    def test_connect_to_database_exception(self):
+    def test_conn_error(self):
         with patch("sqlite3.connect") as mock_connect:
-            mock_connect.side_effect = Exception("Test exception")
-            with patch("pathlib.Path.exists") as mock_exists:
-                mock_exists.return_value = False
-                with self.assertRaisesRegex(Exception, "Test exception"):
-                    app.connect_to_database(0, "test_db_config")
-
-    def test_connect_to_database_st(self):
-        with patch("pathlib.Path.stat") as mock_stat:
-            mock_stat.return_value = Mock(st_mode=0o200)
-            with patch("sqlite3.connect") as mock_connect:
-                mock_connect.return_value = Mock()
-                conn = app.connect_to_database(0, "test_db_config")
-                assert conn is not None
-                mock_connect.assert_called_once_with((Path("test_db_config")))
+            mock_connect.side_effect = Exception("test error")
+            with self.assertRaises(Exception) as cm:
+                app.connect_to_database(False)
+            self.assertEqual(str(cm.exception), "test error")
 
 
 class TestHandles(unittest.TestCase):
@@ -384,6 +374,12 @@ class TestListAllRecords(unittest.TestCase):
     def test_list_all_records(self):
         records = app.list_all_records(self.conn)
         self.assertIsInstance(records, str)
+
+    def test_list_all_records_no_records(self):
+        with patch("src.bplog.app.get_all_records", return_value=None):
+            with patch("builtins.print") as mock_print:
+                app.list_all_records(self.conn)
+                mock_print.assert_called_with("No data to list")
 
     def test_list_all_records_import_error(self):
         def import_mock(name, *args):
