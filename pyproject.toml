@@ -35,7 +35,7 @@ bplog = "src.bplog.app:main"
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::UserWarning"]
 addopts = "--cov"
-testpaths = ["tests/test_bplog.py"]
+testpaths = ["tests/"]
 
 [tool.mypy]
 warn_return_any = true

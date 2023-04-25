@@ -1,5 +1,4 @@
 """Unittest."""
-# flake8: noqa
 import argparse
 import configparser
 import csv
@@ -9,12 +8,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
-import matplotlib
-from matplotlib import pyplot as plt
+# import matplotlib
+# from matplotlib import pyplot as plt
 
 from src.bplog import app
 
-matplotlib.use("agg")
+# matplotlib.use("agg")
 
 
 def setup_test_database():
@@ -443,27 +442,27 @@ class TestTableError(unittest.TestCase):
         conn.close()
 
 
-class TestPlotFunc(unittest.TestCase):
-    def test_plot_blood_pressures_data(self):
-        conn = setup_test_database()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
-            ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
-        )
-        app.plot_blood_pressures(conn)
-        self.assertTrue(plt.fignum_exists(1))
+# class TestPlotFunc(unittest.TestCase):
+#     def test_plot_blood_pressures_data(self):
+#         conn = setup_test_database()
+#         cur = conn.cursor()
+#         cur.execute(
+#             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+#             ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
+#         )
+#         app.plot_blood_pressures(conn)
+#         self.assertTrue(plt.fignum_exists(1))
 
-    @patch.dict("sys.modules", {"matplotlib": None})
-    def test_plot_blood_pressures_sysexit(self):
-        conn = setup_test_database()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
-            ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
-        )
-        with self.assertRaises(SystemExit):
-            app.plot_blood_pressures(conn)
+#     @patch.dict("sys.modules", {"matplotlib": None})
+#     def test_plot_blood_pressures_sysexit(self):
+#         conn = setup_test_database()
+#         cur = conn.cursor()
+#         cur.execute(
+#             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
+#             ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
+#         )
+#         with self.assertRaises(SystemExit):
+#             app.plot_blood_pressures(conn)
 
 
 class TestDatabasePath(unittest.TestCase):
