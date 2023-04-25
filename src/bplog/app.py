@@ -331,8 +331,9 @@ def list_all_records(conn: sqlite3.Connection) -> str:
     """
     records = get_all_records(conn)
     if not records:
-        connect_to_database(use_in_memory = False)
+        connect_to_database(use_in_memory=False)
         print("No data to list")
+        return
 
     table = generate_list_table(records)
     conn.close()
@@ -350,7 +351,8 @@ def plot_blood_pressures(conn: sqlite3.Connection) -> None:
         from matplotlib import pyplot as plt
         from matplotlib.lines import Line2D
     except ImportError:
-        print(list_all_records(conn))
+        if output := list_all_records(conn):
+            print(output)
         sys.exit()
 
     cur = conn.cursor()
@@ -572,7 +574,8 @@ def handle_list_records(
         conn (sqlite3.Connection): Database connection handle
         args (argparse.Namespace): CLI arguments
     """
-    print(list_all_records(conn))
+    if output := list_all_records(conn):
+        print(output)
     sys.exit(0)
 
 
