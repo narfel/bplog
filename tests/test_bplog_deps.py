@@ -3,8 +3,13 @@ import sqlite3
 import unittest
 from unittest.mock import patch
 
-import matplotlib
-from matplotlib import pyplot as plt
+try:
+    import matplotlib
+    from matplotlib import pyplot as plt
+
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
 
 from src.bplog import app
 
@@ -17,6 +22,7 @@ def setup_test_database():
     return conn
 
 
+@unittest.skipIf(not HAS_MATPLOTLIB, "matplotlib not available")
 class TestPlotFunction(unittest.TestCase):
     def test_plot_blood_pressures_data(self):
         conn = setup_test_database()
@@ -40,6 +46,7 @@ class TestPlotFunction(unittest.TestCase):
             app.plot_blood_pressures(conn)
 
 
+@unittest.skipIf(not HAS_MATPLOTLIB, "matplotlib not available")
 class TestNoData(unittest.TestCase):
     def test_plot_blood_pressure(self):
         with patch("builtins.print") as mock_print:
