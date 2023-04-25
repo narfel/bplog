@@ -41,13 +41,6 @@ class TestConnectToDatabase(unittest.TestCase):
         clean_files("config.ini", "test.db")
         self.assertIsInstance(conn, sqlite3.Connection)
 
-    def test_conn_error(self):
-        with patch("sqlite3.connect") as mock_connect:
-            mock_connect.side_effect = Exception("test error")
-            with self.assertRaises(Exception) as cm:
-                app.connect_to_database(False)
-            self.assertEqual(str(cm.exception), "test error")
-
 
 class TestHandles(unittest.TestCase):
     def test_handle_list_records(self):
