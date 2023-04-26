@@ -1,7 +1,7 @@
 # bplog cli
 
-[![GitHub version](https://img.shields.io/badge/version-v0.0.1-blue.svg)](https://github.com/yilber/readme-boilerplate)
-[![License](https://img.shields.io/github/license/yilber/readme-boilerplate.svg)](https://github.com/Yilber/readme-boilerplate/blob/master/LICENSE)
+[![GitHub version](https://img.shields.io/badge/version-v0.0.1-blue.svg)](https://github.com/narfel/bplog/blob/main/README.md)
+[![License](https://img.shields.io/github/license/narfel/bplog)](https://github.com/narfel/bplog/blob/main/LICENSE)
 
 Simple data logger to log blood pressure measurements from the terminal
 
@@ -14,10 +14,9 @@ Simple data logger to log blood pressure measurements from the terminal
 Open a terminal and type
 
 ```sh
-git clone https://github.com/....git
-cd bplog
-pip install bplog .
-or pip install --prefix=~/.local -e .
+~$ git clone https://github.com/narfel/bplog.git
+~$ cd bplog
+~$ pip install bplog .
 ```
 
 ## How to use
@@ -67,9 +66,7 @@ None by default, but optionally:
 * [**prettytable>=3.7.0**](https://pypi) (to prettify listing on the terminal)
 * [**matplotlib>=3.7.1**](https://pypi) (for plotting a graph of the measurements)
 
-## Bugs
-
-If you have questions, feature requests or a bug you want to report, please click [here](https://github.com/.../issues) to file an issue.
+## License
 
 Copyright (c) 2023 Narfel.
 
