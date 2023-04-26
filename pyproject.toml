@@ -13,7 +13,6 @@ keywords = ["data logger", "blood pressure"]
 authors = [{ email = "narfelchen@gmail.com" }, { name = "Narfel" }]
 maintainers = [{ name = "Narfel", email = "narfelchen@gmail.com" }]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",

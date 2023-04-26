@@ -1,4 +1,5 @@
 """Unittest."""
+# pragma: no cover
 import argparse
 import configparser
 import csv
@@ -8,12 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
 
-# import matplotlib
-# from matplotlib import pyplot as plt
-
 from src.bplog import app
-
-# matplotlib.use("agg")
 
 
 def setup_test_database():
@@ -44,9 +40,9 @@ class TestConnectToDatabase(unittest.TestCase):
     def test_conn_error(self):
         with patch("sqlite3.connect") as mock_connect:
             mock_connect.side_effect = Exception("test error")
-            with self.assertRaises(Exception) as cm:
+            with self.assertRaises(Exception) as test_error:
                 app.connect_to_database(False)
-            self.assertEqual(str(cm.exception), "test error")
+            self.assertEqual(str(test_error.exception), "test error")
 
 
 class TestHandles(unittest.TestCase):

@@ -1,4 +1,5 @@
 """Unittests for dependecies"""
+# pragma: no cover
 import sqlite3
 import unittest
 from unittest.mock import patch
@@ -7,13 +8,13 @@ try:
     import matplotlib
     from matplotlib import pyplot as plt
 
+    matplotlib.use("agg")
+
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
 
 from src.bplog import app
-
-matplotlib.use("agg")
 
 
 def setup_test_database():
