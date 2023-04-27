@@ -1,6 +1,6 @@
 name: Tests
 
-on: 
+on:
   - workflow_dispatch
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Cache tox environment
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: .tox
           key: ${{ runner.os }}-tox-${{ hashFiles('**/pyproject.toml') }}
@@ -30,4 +30,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install tox tox-gh-actions
       - name: Test with tox
-        run: tox     
+        run: tox

@@ -2,6 +2,7 @@
 
 [![GitHub version](https://img.shields.io/badge/version-v0.0.1-blue.svg)](https://github.com/narfel/bplog/blob/main/README.md)
 [![License](https://img.shields.io/github/license/narfel/bplog)](https://github.com/narfel/bplog/blob/main/LICENSE)
+![Tests](https://github.com/narfel/bplog/actions/workflows/testtypelint.yml/badge.svg)
 
 Simple data logger to log blood pressure measurements from the terminal
 
