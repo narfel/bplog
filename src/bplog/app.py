@@ -436,12 +436,12 @@ def get_db_path(db_config: str = "") -> Path:
             db_file_path = (
                 config["Database"]["file_path"]
                 if "Database" in config and "file_path" in config["Database"]
-                else str(Path("src") / "bplog" / "bplog.db")
+                else str(Path(__file__).parent.parent / "bplog" / "bplog.db")
             )
         except configparser.Error as parse_error:
             print(f"Error reading config file: {parse_error}")
-            db_file_path = str(Path("src") / "bplog" / "bplog.db")
-        return Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
+            db_file_path = str(Path(__file__).parent / "bplog" / "bplog.db")
+        return Path(db_file_path).parent.parent / f"{Path(db_file_path).stem}.db"
     elif db_config == ".":
         return Path(Path.cwd()) / "bplog.db"
     else:

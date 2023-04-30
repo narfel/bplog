@@ -364,9 +364,11 @@ class TestListAllRecords(unittest.TestCase):
 
     def test_list_all_records_no_records(self):
         with patch("src.bplog.app.get_all_records", return_value=None):
-            with patch("builtins.print") as mock_print:
-                app.list_all_records(self.conn)
-                mock_print.assert_called_with("No data to list")
+            with patch("src.bplog.app.connect_to_database") as mock_connect:
+                with patch("builtins.print") as mock_print:
+                    app.list_all_records(self.conn)
+                    mock_connect.assert_called()
+                    mock_print.assert_called_with("No data to list")
 
     def test_list_all_records_import_error(self):
         def import_mock(name, *args):
@@ -476,7 +478,7 @@ class TestDatabasePath(unittest.TestCase):
         db_config = None
         return_val = app.get_db_path(db_config)
         self.assertEqual(return_val.name, "bplog.db")
-        self.assertEqual(return_val.parent.name, "bplog")
+        self.assertEqual(return_val.parent.name, "src")
 
     def test_config_read_exception(self):
         db_config = None
