@@ -432,29 +432,6 @@ class TestTableError(unittest.TestCase):
         conn.close()
 
 
-# class TestPlotFunc(unittest.TestCase):
-#     def test_plot_blood_pressures_data(self):
-#         conn = setup_test_database()
-#         cur = conn.cursor()
-#         cur.execute(
-#             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
-#             ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
-#         )
-#         app.plot_blood_pressures(conn)
-#         self.assertTrue(plt.fignum_exists(1))
-
-#     @patch.dict("sys.modules", {"matplotlib": None})
-#     def test_plot_blood_pressures_sysexit(self):
-#         conn = setup_test_database()
-#         cur = conn.cursor()
-#         cur.execute(
-#             "INSERT INTO bplog (date, time, systolic, diastolic, comment) VALUES (?, ?, ?, ?, ?)",
-#             ("2020-03-03", "11:00", 120, 80, "Lorem Ipsum"),
-#         )
-#         with self.assertRaises(SystemExit):
-#             app.plot_blood_pressures(conn)
-
-
 class TestDatabasePath(unittest.TestCase):
     def test_reset_db_path_config(self):
         config_file = Path("config.ini")
@@ -478,7 +455,7 @@ class TestDatabasePath(unittest.TestCase):
         db_config = None
         return_val = app.get_db_path(db_config)
         self.assertEqual(return_val.name, "bplog.db")
-        self.assertEqual(return_val.parent.name, "src")
+        self.assertEqual(return_val.parent.name, "bplog")
 
     def test_config_read_exception(self):
         db_config = None

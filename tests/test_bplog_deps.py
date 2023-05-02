@@ -11,7 +11,7 @@ try:
     matplotlib.use("agg")
 
     HAS_MATPLOTLIB = True
-except ImportError:
+except ImportError:  # pragma: no cover
     HAS_MATPLOTLIB = False
 
 from src.bplog import app

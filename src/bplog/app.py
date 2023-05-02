@@ -429,6 +429,7 @@ def get_db_path(db_config: str = "") -> Path:
     Returns:
         Path: Path to the database
     """
+    # breakpoint()
     if not db_config:
         config = configparser.ConfigParser()
         try:
@@ -441,7 +442,7 @@ def get_db_path(db_config: str = "") -> Path:
         except configparser.Error as parse_error:
             print(f"Error reading config file: {parse_error}")
             db_file_path = str(Path(__file__).parent / "bplog" / "bplog.db")
-        return Path(db_file_path).parent.parent / f"{Path(db_file_path).stem}.db"
+        return Path(db_file_path).parent / f"{Path(db_file_path).stem}.db"
     elif db_config == ".":
         return Path(Path.cwd()) / "bplog.db"
     else:
@@ -454,6 +455,7 @@ def update_db_config(db_path: Path) -> None:
     Args:
         db_path (Path): [description]
     """
+    print("Updating config file")
     config = configparser.ConfigParser()
     try:
         if (
@@ -465,7 +467,7 @@ def update_db_config(db_path: Path) -> None:
                 config.set("Database", "file_path", str(db_path))
                 with open("config.ini", "w", encoding="utf-8") as config_file:
                     config.write(config_file)
-        elif db_path != Path("src") / "bplog" / "bplog.db":
+        elif db_path != str(Path(__file__).parent / "bplog" / "bplog.db"):
             config["Database"] = {"file_path": str(db_path)}
             with open("config.ini", "w", encoding="utf-8") as second_config_file:
                 config.write(second_config_file)
@@ -489,11 +491,14 @@ def connect_to_database(
     Returns:
         sqlite3.Connection: Database connection handle
     """
+
     if use_in_memory:
         conn = sqlite3.connect(":memory:")
     else:
         db_path = get_db_path(db_config)
-        update_db_config(db_path)
+        print("Trying to connect to", db_path)
+        if db_config:
+            update_db_config(db_path)
         try:
             conn = sqlite3.connect(db_path)
             database_setup(conn)
@@ -624,6 +629,7 @@ def main() -> None:  # pragma: no cover
     if args.config:
         conn = connect_to_database(args.in_memory, args.config)
     else:
+        print("No config specified. Using built-in database.")
         conn = connect_to_database(args.in_memory)
 
     for arg, bplog_handler in handlers.items():
